@@ -1,686 +1,538 @@
 # Product Requirements Document: VisMin Inter-Island Freight Factoring Protocol
-> **Protocol Codename:** NoirxVelo Freight Factoring (Bunkr VisMin)  
-> **Template Version:** 1.0.0  
-> **Source Standard:** Noir x Velo Hackathon Standards / Verma Engineering Standards (`docs/prd.md`, `docs/AGENTS.md`)  
-> **Task / Tracking ID:** `NV-M0-01`  
-> **Target Network:** Stellar Testnet (Soroban Contracts) & Velo Infrastructure  
+
+> **Codename:** NoirxVelo Freight Factoring (Bunkr VisMin)
+> **Tracking ID:** `NV-M0-01`
+> **Network:** Stellar Testnet (Noir Soroban contracts) + Velo
+> **Version:** 1.1 (draft, kickoff revision)
 
 ---
 
 ## Document Metadata
 
-| Field | Value | Description |
-|---|---|---|
-| **Product / Feature Name** | **VisMin Inter-Island Freight Factoring Protocol** (`noirxvelo`) | Web3 PayFi & RWA freight invoice factoring protocol for Philippine domestic shipping |
-| **Status** | `Approved` | Target implementation specification for the Noir x Velo Hackathon |
-| **Document Owner** | `@helenaherrero515` | Directly responsible individual (DRI) / Product Lead |
-| **Target Milestone** | `M0: Hackathon P0 Winning Demo` | Submission milestone: Sunday, Nov 8, 2026 (Kickoff: Nov 5, 2026) |
-| **Assigned Lane** | `Lane A: Full-Stack Protocol (Contracts, Velo SDK, Agent, UI)` | End-to-end hackathon implementation lane |
-| **Related Smart Contracts** | • `agent_registry`: `CBTDMJVCFQDIVWZBKAKZ2FQ3UEJNAAUFYCTJ3E4ON2MYXPLPSIXQ25JZ`<br>• `device_registry`: `CB4DPMGOA374JIB2ZVD4AHW5GJKQUYNOFGRYNOJ75EFH2KCJSMHOWIRA`<br>• `payment_escrow`: `CA5S4S7QGHJHJWVJBYL3CXZXZTNGKXMNZVDAEQNN7NUXFP4D7BYK7HIX` | Verified Noir Testnet Soroban contracts on Stellar |
-| **Velo Integration** | `@carts1024/velo-sdk@0.1.0-alpha.4` (`https://velo-build.dev`) | Velo Checkout Sessions, Gas Station sponsorship, and Webhook verification |
-| **Primary Audience** | Hackathon Judges, Web3 Investors, Domestic Shipping Operators, Security Auditors | Reviewers and ecosystem evaluators |
-| **Last Updated** | 2026-11-05 | Hackathon kickoff day |
+| Field | Value |
+|---|---|
+| **Product** | VisMin Inter-Island Freight Factoring Protocol (`noirxvelo`) |
+| **Status** | `Draft: in review`. It becomes `Approved` only after the Nov 5 spikes in §16 pass. |
+| **Owner (DRI)** | `@helenaherrero515` |
+| **Milestone** | `M0: Hackathon demo`. Build window is Nov 5 to 8, 2026. **Submissions close Sun Nov 8, 8:00 AM (Manila).** |
+| **Contracts (Noir Testnet)** | `device_registry` `CB4DPMGOA374JIB2ZVD4AHW5GJKQUYNOFGRYNOJ75EFH2KCJSMHOWIRA`<br>`agent_registry` `CBTDMJVCFQDIVWZBKAKZ2FQ3UEJNAAUFYCTJ3E4ON2MYXPLPSIXQ25JZ`<br>`payment_escrow` `CA5S4S7QGHJHJWVJBYL3CXZXZTNGKXMNZVDAEQNN7NUXFP4D7BYK7HIX` |
+| **SDKs** | `@carts1024/velo-sdk@0.1.0-alpha.4`, `@stellar/stellar-sdk`, and optionally `@noirx402/agent-sdk` (pin exact versions on Nov 5) |
+| **Audience** | Judges, the build team, and shipping-operator and investor reviewers |
+| **Last updated** | 2026-11-05 |
+
+### What changed from v1.0
+
+| Area | v1.0 | v1.1 | Why |
+|---|---|---|---|
+| Contract methods | Invented `is_authorized`, `get_allowance`, `create_invoice_escrow`, `settle_invoice`, `update_telemetry_status` | Uses the actual interface: `fund_escrow`, `authorize`, `claim`, `defund_escrow`, `sweep_on_revoke`, `register_agent`, `revoke_agent`, `check_payment` | The deployed contracts don't have the v1.0 methods. Code written against them fails on day 1. |
+| Settlement model | A single `settle()` call splits funds | The settlement agent makes several capped `authorize` payouts, and each payee then calls `claim` | That is how `payment_escrow` actually moves money. |
+| Delivery proof | Written to `device_registry` as `DELIVERED` | Signed attestation kept off-chain, with its hash logged next to the `authorize` tx | The registry stores device identity, not voyage status. |
+| Fail-closed | Contract locks into `dispute_pending` with multi-sig review | Agent policy is revoked and funds stay with the escrow owner (treasury). Disputes are resolved off-chain. | That state doesn't exist on-chain. |
+| Demo money | ₱1,000,000 in "USDC/PHPT" | Testnet XLM at a fixed **demo rate**, shown in PHP and clearly labeled | Testnet accounts can't hold ₱1M of real stablecoin. The escrow token is fixed per device. |
+| Yield math | "3% flat ≈ 18.25% APY" | 3% of face value is about 3.53% on principal over 60 days, about 21.5% simple annualized | v1.0 annualized the yield on face value, not on capital deployed. |
+| Velo calls | `anchor: "pdax"`, `velo.gas.sponsor()` only, `verifyWebhookSignature` | Only calls documented by other teams; everything else is marked **[confirm]** | We avoid building on SDK options that may not exist. |
+| Status / sign-off | "Approved" with every box ticked on kickoff day | Draft. Sign-off happens after the spikes. | Approval should mean the design has been checked against reality. |
+| Seed data | Real companies (San Miguel, Nestlé, 2GO, etc.) as demo customers | Fictional shippers and vessels | Avoids implying partnerships and keeps the pitch clean. |
+| Added | — | Hackathon requirement map, agent decision schema, nonce scheme, demo script, schedule, cut order, compliance note | Needed to build and judge the project. |
 
 ---
 
-## 1. Executive Summary & Core Mission
+## 1. Summary
 
-### 1.1 One-Sentence Pitch
-An autonomous Web3 freight invoice factoring protocol that turns verified Philippine inter-island e-Waybills into tokenized Real World Assets (RWAs), unlocks immediate 80–85% working capital for shipping lines via Stellar Testnet liquidity pools, and automates repayment and yield settlement via an AI Agent monitoring vessel AIS telemetry feeds and Velo Pay checkout rails.
+### 1.1 One-sentence pitch
+Philippine inter-island shipping lines get **85% of a freight invoice the day they sail**. An AI settlement agent, with spending limits enforced on-chain, releases the advance once the e-Waybill checks out. When the cargo owner pays through Velo, the same agent repays investors and returns the reserve to the shipowner.
 
-### 1.2 Core Mission & Elevator Pitch
-In the Philippine archipelagic supply chain (7,641 islands), domestic shipping lines (e.g., 2GO, Trans-Asia Shipping Lines, FastCat, Lorenzo Shipping) and regional forwarders provide the economic lifeline connecting Luzon, the Visayas, and Mindanao (Manila $\leftrightarrow$ Cebu $\leftrightarrow$ Cagayan de Oro $\leftrightarrow$ Davao). However, shipping operators are crushed by a structural cash-flow mismatch: multi-billion-peso corporate cargo owners (conglomerates and FMCGs like San Miguel, Nestlé, Universal Robina) enforce **60 to 90-day payment terms**, while shipping lines must pay **cash-before-delivery for bunker fuel**, **upfront cash terminal fees to port authorities**, and **daily crew payroll**.
+### 1.2 The problem in one paragraph
+Big cargo owners pay freight on Net-60 to Net-90 terms. Shipping lines pay for bunker fuel, port dues and crew **before** sailing. That gap pushes small operators toward slow bank factoring or expensive informal loans. Lenders hesitate for their own reasons: paper waybills can be pledged twice, and nobody can easily confirm that the cargo arrived.
 
-The **VisMin Inter-Island Freight Factoring Protocol** solves this multi-million-peso liquidity bottleneck. Shipping lines upload verified e-Waybills and freight invoices to mint RWA Freight Tokens. Global and domestic liquidity providers fund these invoices upfront (disbursing an **85% advance in seconds** to the operator’s Stellar wallet). An **Autonomous AI Agent** tracks the vessel’s physical voyage using maritime AIS transponder and port telemetry registered in Noir’s `device_registry`, while Noir’s `agent_registry` enforces strictly constrained agent spending allowances. When cargo is delivered and the corporate debtor settles the invoice via a frictionless **Velo Pay checkout link** (supporting PHPT/USDC with PDAX on/off-ramp options), the AI Agent triggers automated settlement through Noir’s `payment_escrow` contract—distributing principal + yield (2%–5%) to investors, releasing the remaining 15% reserve minus fees to the shipowner, and retaining a 0.5% protocol fee.
-
-```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                                VISMIN FACTORING PROTOCOL                               │
-├────────────────────────────────┬───────────────────────────────────────────────────────┤
-│ 1. Invoice Tokenization        │ Domestic Shipowner uploads ₱1,000,000 e-Waybill (Net-60)│
-│ 2. Upfront Cash Flow (85%)     │ Liquidity pool funds ₱850,000 instantly to shipowner   │
-│ 3. Autonomous Monitoring       │ AI Agent monitors AIS telemetry (Manila → Cebu port)  │
-│ 4. Velo Pay Checkout           │ Corporate debtor settles ₱1,000,000 via Velo link     │
-│ 5. Automated Settlement        │ Escrow splits: ₱880k to LPs (₱30k yield), ₱115k rebate │
-└────────────────────────────────┴───────────────────────────────────────────────────────┘
-```
-
-### 1.3 The Autonomous Agent & Stellar Advantage
-- **Programmatic Trust via Constrained Agents:** Traditional factoring requires manual paper audits, phone confirmations, and days of clerical verification. The Noir `agent_registry` allows an autonomous AI agent to verify delivery telemetry and disburse funds strictly according to cryptographic rules without human delay or custodial risk.
-- **Micro-Fee, Sub-Second Settlement on Stellar:** Stellar provides 3- to 5-second ledger finality with near-zero transaction fees ($< \$0.0001$), making high-frequency freight micro-factoring economically viable down to single container shipments.
-- **Frictionless Enterprise Payments via Velo:** Corporate FMCG treasurers will not navigate complex Web3 wallets or bridges; `@carts1024/velo-sdk` delivers a hosted Velo Pay checkout experience integrated with Philippine fiat anchors (PDAX PHPT stablecoins) and gas-sponsored transactions (`velo.gas.sponsor`).
-- **Cryptographic Physical-World Binding:** By anchoring vessel AIS transponders and container GPS beacons in Noir’s `device_registry`, invoices are irrevocably tied to physical maritime assets, eliminating ghost shipments and invoice duplication fraud.
+### 1.3 Why this design
+- **Bounded agent authority.** The agent can only move money through `payment_escrow.authorize`. `agent_registry.check_payment` rejects any single payment above the cap, after expiry, or in the wrong asset. A compromised agent key is limited to capped payments from one invoice's escrow.
+- **Invoice = device.** Each e-Waybill's hash is registered in `device_registry` as the device that owns an escrow balance. That gives every invoice its own on-chain ledger, and a duplicate registration can be rejected (spike S3).
+- **Cheap, fast settlement.** Stellar's low fees and fast finality make it practical to settle a single container shipment.
+- **Payer stays in Web2.** The cargo owner pays through a hosted Velo checkout link. Velo Gas Station sponsors contract-call fees, so shipowners never handle XLM.
 
 ---
 
-## 2. Problem Statement & User Pain Points
+## 2. Problem & Pain Points
 
-### 2.1 The Problem: The Philippine Domestic Sea-Freight Working Capital Trap
-The Philippines is an archipelagic nation where over 85% of domestic trade tonnage is moved by sea. The golden inter-island shipping triangle connects the Port of Manila (North/South Harbor) to the Port of Cebu (Central Visayas) and the Ports of Cagayan de Oro and Davao (Mindanao). 
+### 2.1 Context
+The VisMin routes (Manila ↔ Cebu ↔ Cagayan de Oro ↔ Davao) carry much of the country's domestic cargo by sea. **[needs source: cite a PPA/MARINA/PSA figure before using any % in the pitch]**
 
-Large industrial conglomerates and FMCG shippers dictate commercial credit terms. Shipping companies transport millions of pesos worth of cargo under deferred Net-60 to Net-90 day invoicing. However, maritime operations have zero tolerance for payment delays:
-1. **Bunker Fuel (40%–55% of Voyage Opex):** Marine Gas Oil (MGO) and Very Low Sulfur Fuel Oil (VLSFO) suppliers (Petron, Shell, Phoenix Petroleum, SeaOil) enforce Cash-Before-Delivery (CBD) or maximum Net-7 terms before a bunker barge connects to the vessel manifold.
-2. **Port Terminal Fees (PPA & Private Operators):** The Philippine Ports Authority (PPA) and terminal concessionaires (ICTSI, ATI, Cebu Port Authority) require immediate upfront payment of vessel entrance dues, berthage fees, pilotage, tug assist, and arrastre/stevedoring charges before granting vessel departure clearance.
-3. **Crew Wages and Vessel Maintenance:** Daily vessel operations require constant cash liquidity for seafarer payroll (regulated under POEA/DOLE standards), ship provisions, and emergency engine maintenance.
+Operators carry three costs that must be paid up front:
+1. **Bunker fuel.** It is the largest voyage expense, and suppliers usually want cash before delivery or very short terms.
+2. **Port and terminal charges.** Dues, berthage, pilotage and arrastre are paid before departure clearance.
+3. **Crew and maintenance.** Payroll and repairs need steady cash.
 
-### 2.2 Core Pain Points
-1. **Crippling Working Capital Drought:** Shipowners and forwarders operate on razor-thin operating margins with their capital tied up in unpaid receivables, forcing them to delay vessel sailings, cut profitable routes, or take predatory informal loans (5–10% monthly interest).
-2. **Traditional Bank Factoring Failure:** Philippine commercial banks (BDO, BPI, Metrobank) take 3 to 6 weeks to approve factoring credit lines, mandate heavy real-estate collateral, and refuse to process invoices under ₱10,000,000 or invoices from SME forwarders.
-3. **Invoice Fraud & Double-Financing Risk:** In the domestic paper-heavy logistics sector, unscrupulous operators occasionally pledge the same Bill of Lading (BOL) or e-Waybill across multiple financial institutions, creating high risk that scares away conventional non-bank lenders.
-4. **Friction in Cross-Border & Web3 Settlement:** Global DeFi liquidity pools want access to uncorrelated, high-yielding Real World Assets (RWAs), but cannot navigate Philippine logistics paperwork, domestic banking rails, or verify whether cargo actually arrived at the port.
+### 2.2 Pain points
+1. **Cash locked in receivables** for 60 to 90 days, which means delayed sailings and costly informal credit.
+2. **Bank factoring is slow and hard to get** for small forwarders: long approvals, collateral requirements and minimum ticket sizes. **[needs source for any specific number of weeks or ₱ minimum]**
+3. **Double-pledging risk.** The same waybill can be financed twice when it lives on paper.
+4. **No delivery visibility for outside capital.** Investors can't check whether cargo arrived.
 
 ---
 
 ## 3. Goals & Success Criteria
 
-### 3.1 Primary Milestone / Hackathon Goals (Nov 5 – Nov 8, 2026)
-- [ ] **Goal 1 (Contract Integration):** Successfully connect and execute transactions against the three deployed Noir Testnet contracts:
-  - `agent_registry` (`CBTDMJVCFQDIVWZBKAKZ2FQ3UEJNAAUFYCTJ3E4ON2MYXPLPSIXQ25JZ`)
-  - `device_registry` (`CB4DPMGOA374JIB2ZVD4AHW5GJKQUYNOFGRYNOJ75EFH2KCJSMHOWIRA`)
-  - `payment_escrow` (`CA5S4S7QGHJHJWVJBYL3CXZXZTNGKXMNZVDAEQNN7NUXFP4D7BYK7HIX`)
-- [ ] **Goal 2 (Velo SDK Checkout & Webhooks):** Integrate `@carts1024/velo-sdk@0.1.0-alpha.4` to generate working Velo Pay checkout sessions for invoice settlement and handle cryptographic webhook callbacks (`payment.succeeded`, `contract.event`).
-- [ ] **Goal 3 (Velo Gas Station Sponsorship):** Implement `velo.gas.sponsor()` to sponsor transaction fees for shipowner invoice registration and agent settlement calls, proving a 100% gasless UX on Stellar Testnet.
-- [ ] **Goal 4 (Autonomous AI Agent Engine):** Demonstrate an autonomous off-chain AI agent that evaluates simulated/live AIS marine telemetry, confirms vessel berthing at Port of Cebu, and executes the escrow settlement cycle without human intervention.
-- [ ] **Goal 5 (Live End-to-End Demo Loop):** Deliver a polished Next.js application showcasing:
-  1. Shipowner e-Waybill tokenization & instant 85% liquidity payout.
-  2. Real-time AIS vessel telemetry map and geofence tracking.
-  3. Corporate debtor Velo Pay checkout settlement.
-  4. Instant programmatic yield disbursement to investor wallets.
+### 3.1 Hackathon goals (Nov 5 to 8)
+- [ ] **G1: Contracts.** The full lifecycle runs on Testnet: `register` → `register_agent` → `fund_escrow` → `authorize` → `claim` → `revoke_agent` → `sweep_on_revoke`.
+- [ ] **G2: Velo checkout and webhook.** The debtor pays through a Velo checkout session, and a verified, de-duplicated webhook triggers settlement.
+- [ ] **G3: Gas Station.** Contract calls are fee-sponsored, with a working fallback if sponsorship is refused.
+- [ ] **G4: Agent decides.** The settlement agent issues `ADVANCE`, `SETTLE`, `HOLD` and `DEFAULT` decisions with reasons, and a deterministic executor turns each decision into contract calls.
+- [ ] **G5: Demo.** A ~90-second live loop with explorer links for every step, including **one on-chain rejection of an over-cap payment**.
 
-### 3.2 Product Goals Beyond Current Milestone (Post-Hackathon)
-- Integrate live satellite AIS data feeds (Spire Maritime / AISHub API) covering all major domestic Philippine sealanes.
-- Partner with domestic Philippine anchors (e.g., PDAX PHPT stablecoin) for direct automated PHP bank settlement via InstaPay / PESONet.
-- Deploy smart contract credit scoring based on historic voyage completion records stored in `device_registry`.
-- Enable dynamic risk pricing: automated factoring fee calculation based on vessel class, weather/typhoon risk, and debtor credit rating.
+### 3.2 KPIs
 
-### 3.3 Quantitative Success Metrics & KPIs
+| Metric | Target | How we measure |
+|---|---|---|
+| Advance latency (decision → `authorize` confirmed) | ≤ 10 s on Testnet | Timestamps in the decision log |
+| Escrow conservation | Exactly 0 base units left over | After settlement, `balance_of(invoice_device) == 0` and Σ authorized == Σ funded |
+| Webhook verification | All valid deliveries accepted; all forged, stale or duplicate ones rejected | Unit tests with fixture payloads |
+| Agent policy | 0 over-cap or expired payments succeed | Negative test: an over-cap `authorize` reverts on-chain |
+| Idempotency | A replayed webhook or retried job never pays twice | Replay test against the event log |
+| Berthing detection (simulated) | 100% on the 3 scripted routes, 0 false positives on the "anchored offshore" case | Simulation tests |
 
-| Metric | Target | Measurement Method | Verification Task |
+### 3.3 After the hackathon
+Live AIS feeds, a PHP stablecoin and off-ramp partner, a multi-investor pool contract, debtor credit scoring from voyage history, and risk-based pricing.
+
+---
+
+## 4. Non-Goals
+- **No mainnet and no real money.** Testnet only, with demo amounts.
+- **No custody of fiat.** Bank rails and PDAX appear only as roadmap items or labeled mockups.
+- **No ML underwriting.** Eligibility uses deterministic rules (§8.3).
+- **No pool contract.** In the MVP each invoice has one LP. Pooling happens off-chain or comes later.
+- **No physical inspection.** Delivery evidence is simulated AIS plus a terminal discharge event.
+
+**Scope freeze rule:** once the full loop (Tokenize → Advance → Berth → Pay → Settle → Claim) has run cleanly three times on Testnet with recorded tx hashes, freeze the core and polish only.
+
+---
+
+## 5. Personas
+
+| Persona | Need | What they get | Screen |
 |---|---|---|---|
-| **Advance Payout Latency** | $\le 5.0\text{ seconds}$ | Wall-clock time from investor pool funding to shipowner Stellar wallet receipt | Automated E2E test (`test-advance-payout.ts`) |
-| **Velo Checkout Generation** | $\le 1.5\text{ seconds}$ | Latency of `velo.checkout.sessions.create()` API call | Integration benchmark (`velo-checkout.test.ts`) |
-| **Webhook Signature Verification** | $100\%$ valid passes; $100\%$ forged rejected | Web Crypto API signature test against Velo secret | Security test (`webhook-signature.test.ts`) |
-| **Gas Station Sponsorship Rate** | $\ge 99\%$ success | Testnet Soroban transaction fee sponsorship via `velo.gas.sponsor()` | Gas module test (`gas-sponsor.test.ts`) |
-| **Autonomous Berthing Detection Accuracy** | $100\%$ on simulated Cebu geofence breach | AI agent state machine evaluation on GPS/AIS coordinates | Agent simulation test (`agent-berthing.test.ts`) |
-| **Escrow Fund Accounting Integrity** | $0.00\text{ discrepancy}$ | Strict conservation: $\text{Advance} + \text{Yield} + \text{Rebate} + \text{Fee} \equiv \text{Face Value}$ | Math invariant unit tests (`escrow-math.test.ts`) |
-| **Agent Authorization Constraint** | $0\text{ unauthorized calls}$ | Noir `agent_registry` rejects transactions exceeding per-payment caps | Policy test (`agent-limits.test.ts`) |
+| **Shipowner / forwarder CFO** (small inter-island line) | Cash for fuel and port fees now | 85% advance at departure and the reserve back at settlement, without holding XLM | Shipowner portal |
+| **Liquidity provider** | Short-tenor, real-economy yield | Principal plus a fixed yield (3% of face in the demo), paid automatically | Investor portal |
+| **Cargo owner (debtor) treasurer** | Pay the invoice without touching crypto | A normal hosted checkout link | Velo checkout |
+| **Settlement agent** | Clear inputs, bounded authority | Decides advance and settlement within on-chain caps | Ops / agent log |
+| **Protocol ops** | Handle exceptions | Hold queue, manual override, revoke and sweep | Ops dashboard |
 
 ---
 
-## 4. Non-Goals & Scope Boundaries
+## 6. Principles & Invariants
 
-### 4.1 Explicit Non-Goals for this Milestone
-- **NO Unregulated Fiat Custody:** The protocol will not hold custody of Philippine Pesos directly in commercial bank accounts; all fiat representation is anchored via Stellar USDC or PDAX PHPT stablecoin contracts.
-- **NO Complex Underwriting AI:** The MVP agent will not build a full balance-sheet ML risk model; credit scoring is simulated via verified historical invoice data and deterministic rules.
-- **NO Physical Cargo Inspection:** Proof of delivery relies on AIS vessel docking telemetry, container GPS beacon pings, and port gate-out events—not manual physical cargo unboxing audits.
-- **NO Mainnet Deployment in Hackathon:** Deployment is strictly constrained to Stellar Testnet and Noir Testnet contract addresses provided by the hackathon committee.
-
-### 4.2 Scope Cutoff Trigger
-> **Hard Cutoff Rule:** Once the complete 4-step loop (Tokenize $\rightarrow$ Fund Advance $\rightarrow$ Berthing Verification $\rightarrow$ Velo Pay Settlement) runs cleanly three (3) consecutive times on Stellar Testnet with recorded transaction hashes, freeze the core code. Do not add auxiliary features (e.g., multi-currency swaps, secondary debt markets) that risk demo stability during the face-to-face pitch.
-
----
-
-## 5. Target Personas & Deployment Modes
-
-### 5.1 Persona Matrix
-
-| Persona | Role / Profile | Primary Pain Point | Core Value Delivered | UI View / Touchpoint |
-|---|---|---|---|---|
-| **Domestic Shipowner / Forwarder** | Operations CFO at regional shipping line (e.g. 5–20 inter-island cargo vessels). | Waits 60–90 days for freight payments while bunker suppliers demand immediate cash before bunkering. | Instant 85% cash advance on verified e-Waybills in seconds; zero bank paperwork; gasless UX. | **Shipowner Portal:** Invoice upload, instant balance tracker, vessel registration. |
-| **Web3 Liquidity Provider (LP)** | Global DeFi treasury, crypto fund, or high-yield individual investor. | Low yield on traditional DeFi lending; seeks uncorrelated Real World Asset (RWA) cash flows. | 2%–5% flat yield over 30–60 days (18%–30% annualized APY) backed by verified real-world shipping debt. | **Investor Portal:** Invoice debt pool catalog, risk metrics, one-click funding. |
-| **Corporate Debtor (Cargo Owner)** | Treasury Manager at FMCG conglomerate (San Miguel, Nestlé, Del Monte). | Dislikes dealing with crypto, wallets, private keys, or changing accounting software. | Clean, branded Velo Pay checkout link to pay invoices via existing fiat/banking methods (e.g. PDAX rails). | **Velo Checkout Screen:** Familiar payment page, zero crypto friction. |
-| **Autonomous AI Agent** | Off-chain software agent operating under delegated Noir authority. | Manual reconciliation between vessel tracking satellites and blockchain escrow contracts is slow and error-prone. | Autonomous 24/7 telemetry monitoring, geofence verification, and automated escrow triggering. | **Agent Dashboard / Logs:** Live telemetry stream, event decisions, proof hashes. |
-
-### 5.2 System Topology & Deployment Modes
-
-```mermaid
-graph TD
-    subgraph Layer 1: Client & User Applications
-        SO[Shipowner Portal: Next.js] -->|Uploads e-Waybill & Invoice| API[Protocol Backend API]
-        LP[Investor Portal: Next.js] -->|Supplies USDC/PHPT Liquidity| API
-        CD[Corporate Debtor] -->|Receives Velo Checkout Link| VP[Velo Pay Gateway]
-    end
-
-    subgraph Layer 2: Off-Chain Autonomous Agent Engine
-        AIS[Maritime AIS Telemetry Stream] -->|Vessel GPS / Berthing Data| AGENT[Autonomous AI Agent Engine]
-        API -->|Invoice & Device Metadata| AGENT
-        VP -->|Webhook: payment.succeeded| WH[Velo Webhook Listener]
-        WH -->|Verified Settlement Trigger| AGENT
-    end
-
-    subgraph Layer 3: Velo Platform & Operations Layer
-        VELO_SDK[@carts1024/velo-sdk] <-->|Gas Station: sponsor| GS[Velo Gas Station API]
-        VELO_SDK <-->|Checkout Sessions API| VP
-        AGENT -->|Uses SDK for Payouts & Calls| VELO_SDK
-    end
-
-    subgraph Layer 4: Noir Testnet Smart Contracts on Stellar
-        AGENT -->|Verify Allowed Spending Limits| AR[agent_registry<br/>CBTDMJVCFQDIVWZBKAKZ2FQ3UEJNAAUFYCTJ3E4ON2MYXPLPSIXQ25JZ]
-        AGENT -->|Verify Vessel AIS Transponder & Hash| DR[device_registry<br/>CB4DPMGOA374JIB2ZVD4AHW5GJKQUYNOFGRYNOJ75EFH2KCJSMHOWIRA]
-        AGENT -->|Trigger Payout & Final Settlement| PE[payment_escrow<br/>CA5S4S7QGHJHJWVJBYL3CXZXZTNGKXMNZVDAEQNN7NUXFP4D7BYK7HIX]
-    end
-
-    PE -.->|Instant 85% Advance| SOW[Shipowner Stellar Wallet]
-    PE -.->|Principal + 3% Yield| LPW[Investor Stellar Wallet]
-    PE -.->|0.5% Protocol Fee| TREASURY[Protocol Treasury Wallet]
-```
+1. **Least privilege.** The agent key can only call `authorize`, and only within the `agent_registry` policy for that invoice device (cap, asset, expiry). The treasury (escrow owner) key is never given to the LLM.
+2. **The LLM proposes and the executor acts.** The model returns a schema-validated decision. Deterministic code checks the preconditions in §8.3, builds the transactions and submits them. If any check fails, nothing is sent.
+3. **Integer accounting.** All amounts are `i128` stroops (1 XLM = 10⁷). Rounding rule: yield and fee round **down**, and the shipowner rebate takes the remainder, so the parts always add up to the face value exactly.
+4. **Two separate gates:**
+   - **Advance gate:** waybill hash newly registered, debtor known, vessel shown underway from the origin port.
+   - **Settlement gate:** verified Velo `payment.succeeded` for this invoice **and** a berthing attestation at the destination.
+5. **Fail closed.** On any anomaly (AIS dark for more than 12 h, route deviation, invalid webhook, amount mismatch) the agent returns `HOLD`. Ops can `revoke_agent` so no further `authorize` succeeds. Funds stay in escrow under treasury control (`defund_escrow` / `sweep_on_revoke`).
+6. **Exactly-once payments.** Every payout uses a deterministic nonce, and webhook handling is idempotent (§10.4).
+7. **Gasless for users.** All user and agent transactions go through Velo Gas Station when it accepts them, and a relayer account covers fees when it doesn't.
 
 ---
 
-## 6. Product Principles & Engineering Invariants
+## 7. Scope
 
-1. **Constrained Agentic Autonomy (Least Privilege):** The AI Agent never holds full custodial keys to protocol funds. It acts strictly through permissions granted inside Noir's `agent_registry`, with on-chain spending limits and strict destination whitelisting enforced by `payment_escrow`.
-2. **Deterministic Cryptographic Accounting:** The math of invoice factoring is deterministic:
-   $$\text{Face Value} \equiv \text{Advance (85\%)} + \text{Yield (3\%)} + \text{Shipowner Rebate (11.5\%)} + \text{Protocol Fee (0.5\%)}$$
-   Zero rounding leaks or floating-point imprecision are allowed; all calculations use integer stroops / base units.
-3. **Physical-World Proof Before Settlement:** The AI Agent is strictly prohibited from executing final escrow yield distribution unless both conditions are met:
-   - Proof of physical delivery is validated via `device_registry` (AIS berthing coordinates matched to port geofence).
-   - Proof of corporate payment is confirmed via Velo webhook cryptographically verified with the shared secret.
-4. **Zero-Gas Friction for Shipowners:** Shipping operators must never be forced to acquire, hold, or manage XLM to pay network gas fees. All Soroban transaction invocations utilize Velo's Gas Station (`velo.gas.sponsor()`).
-5. **Fail-Closed Escrow Security:** If any anomaly occurs (e.g., vessel deviates from route, AIS transponder goes dark for $>12$ hours, or webhook signature verification fails), the `payment_escrow` contract locks into a `dispute_pending` state, requiring multi-sig governance review.
-6. **Immutable e-Waybill Anchoring:** Every tokenized invoice must have its SHA-256 content hash anchored in the contract at mint time to prevent duplicate factoring across multiple protocols.
-7. **Strict Schema & Type Enforcement:** All off-chain agent inputs and outputs must validate against strict JSON schemas before triggering on-chain transactions.
+### 7.1 P0 (must ship)
+- **P0-1 Chain service.** Generated TS bindings (`stellar contract bindings typescript`) or `@noirx402/agent-sdk`, wrapped in one module: `registerDevice`, `registerAgent`, `fundEscrow`, `authorize`, `claim`, `balanceOf`, `pendingBalance`, `getPolicy`, `revokeAgent`, `sweepOnRevoke`, `defundEscrow`.
+- **P0-2 Provisioning script.** Creates the Testnet accounts (treasury, shipowner, LP, debtor, settlement agent, relayer) with Friendbot and prints the explorer links.
+- **P0-3 Tokenize.** The shipowner enters waybill details. The backend computes `invoice_hash = sha256(canonical_waybill_json)`, then calls `device_registry.register` (treasury as owner) and `agent_registry.register_agent` (cap, asset, expiry).
+- **P0-4 Advance.** The LP funds the escrow (`fund_escrow`). The agent decides `ADVANCE`, the executor calls `authorize` to the shipowner, and the shipowner calls `claim`.
+- **P0-5 Voyage simulator and berthing check** (§8.2).
+- **P0-6 Debtor checkout.** `velo.checkout.sessions.create`, a verified webhook, then the treasury calls `fund_escrow` for the face amount.
+- **P0-7 Settlement.** The agent decides `SETTLE`, and the executor makes three sequential `authorize` calls (LP, shipowner rebate, treasury fee). Payees `claim`.
+- **P0-8 Guardrail demo.** The agent tries to pay the full face value to one payee. `check_payment` rejects it on-chain, and we show the failed tx.
+- **P0-9 Dashboard.** Status badges, a route map, the decision log with reasons, and an explorer link on every step.
 
----
+### 7.2 P1 (stretch)
+- `DEFAULT` path: no payment by the due date + grace, so `revoke_agent` and `sweep_on_revoke` run, and an ops case opens.
+- Multiple routes (Manila→Cebu, Cebu→CDO, Manila→Davao) with a weather-delay scenario.
+- An LLM-parsed waybill PDF/photo that pre-fills the form (the parse result still goes through schema checks).
+- Risk/yield preview slider (UI only).
 
-## 7. Feature Scope & Phased Prioritization
+### 7.3 Later
+Pool contract and secondary market, ERP connectors, live AIS subscriptions, PHP stablecoin/off-ramp, legal assignment-of-receivables workflow.
 
-### 7.1 P0: Must-Have (Winning Hackathon Core Loop)
-*Non-negotiable features required for the Nov 8 live submission.*
-
-- [ ] **P0-1: Noir Contract Bindings:** Full TypeScript bindings and client initialization for:
-  - `agent_registry` (`CBTDMJVCFQDIVWZBKAKZ2FQ3UEJNAAUFYCTJ3E4ON2MYXPLPSIXQ25JZ`)
-  - `device_registry` (`CB4DPMGOA374JIB2ZVD4AHW5GJKQUYNOFGRYNOJ75EFH2KCJSMHOWIRA`)
-  - `payment_escrow` (`CA5S4S7QGHJHJWVJBYL3CXZXZTNGKXMNZVDAEQNN7NUXFP4D7BYK7HIX`)
-- [ ] **P0-2: Velo SDK Client & Checkout Session:** Initialize `@carts1024/velo-sdk` with Testnet credentials; implement API endpoint to generate dynamic Velo Pay checkout URLs for invoice repayment.
-- [ ] **P0-3: Velo Gas Station Integration:** Connect `velo.gas.sponsor()` to sponsor gas for Soroban contract calls, demonstrating zero-fee interaction for shipowners.
-- [ ] **P0-4: Velo Webhook Receiver & Verifier:** Secure endpoint (`/api/webhooks/velo`) implementing Web Crypto signature verification via `verifyWebhookSignature` to handle `payment.succeeded` events.
-- [ ] **P0-5: Invoice Tokenization & Escrow Vault:** Shipowner UI to input e-Waybill details (₱1,000,000 value, Manila $\rightarrow$ Cebu route, 60-day tenor), minting the RWA debt record and creating the escrow position.
-- [ ] **P0-6: Investor Liquidity Advance:** Investor UI to supply ₱850,000 liquidity (85%), triggering immediate disbursement to the shipowner wallet while locking the position in `payment_escrow`.
-- [ ] **P0-7: Autonomous AI Telemetry Agent:** Agent loop consuming simulated AIS maritime data (vessel speed, heading, GPS coordinates), detecting Port of Cebu berthing, and asserting delivery readiness.
-- [ ] **P0-8: Automated Settlement Cycle:** Upon webhook receipt of corporate debtor payment, AI Agent calls `payment_escrow` to disburse ₱880,000 to investors (₱30k yield), ₱115,000 rebate to shipowner, and ₱5,000 to protocol treasury.
-- [ ] **P0-9: Live Visual Dashboard:** Responsive Next.js interface with real-time route visualization, escrow state badges, telemetry logs, and Stellar Testnet transaction explorer links.
-
-### 7.2 P1: Stretch (Continuity & Hackathon Polish)
-- [ ] **P1-1: Multi-Route Simulator:** Interactive route switcher (Manila $\rightarrow$ Cebu, Cebu $\rightarrow$ Cagayan de Oro, Manila $\rightarrow$ Davao) with simulated weather delays.
-- [ ] **P1-2: PDAX Mock Anchor Integration:** Toggle in Velo Pay checkout displaying direct Philippine Peso (PHPT) payment rails.
-- [ ] **P1-3: Dynamic Risk & Yield Calculator:** Interactive slider adjusting investor yield (2%–5%) and advance rate (75%–85%) based on simulated debtor credit rating.
-- [ ] **P1-4: Automated e-Waybill PDF Parser:** Drag-and-drop parser extracting invoice amount, consignee, and vessel IMO directly from standard MARINA-accredited bills of lading.
-
-### 7.3 P2: Out of Scope (Future Commercial Roadmap)
-- Enterprise ERP connectors (SAP, Oracle NetSuite, Microsoft Dynamics) for automated invoice sync.
-- Live satellite AIS API contracts (Spire Maritime / MarineTraffic enterprise subscriptions).
-- Full legal debt collection assignment frameworks under Philippine civil law (Republic Act No. 8556 - Financing Company Act).
-- Secondary trading marketplace for active RWA freight debt tokens.
+### 7.4 Cut order if behind
+1. Multi-route → 2. LLM waybill parsing → 3. `DEFAULT` path → 4. map animation (use a progress bar instead). **Never cut:** tokenize → advance → pay → settle → claim → over-cap rejection.
 
 ---
 
-## 8. Autonomous AI Agent Capabilities & Behavior Specifications
+## 8. Settlement Agent
 
-### 8.1 Workflows Specification
+### 8.1 State machine
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Idle: Agent Initialized
-    Idle --> InTransit: Invoice Funded & Vessel Departs Port of Manila
-    InTransit --> TelemetryMonitoring: AIS Telemetry Stream Active
-    TelemetryMonitoring --> TelemetryMonitoring: Evaluate GPS, SOG, COG against Sea Lane
-    TelemetryMonitoring --> BerthingDetected: Geofence Breach (Port of Cebu, SOG < 0.5 kn)
-    BerthingDetected --> AwaitingPayment: Proof of Delivery Logged in device_registry
-    AwaitingPayment --> SettlementExecuting: Velo Webhook (payment.succeeded)
-    SettlementExecuting --> Settled: payment_escrow.settle() executed
-    Settled --> [*]: Cycle Complete
+    [*] --> TOKENIZED: register + register_agent
+    TOKENIZED --> FUNDED: LP fund_escrow
+    FUNDED --> ADVANCED: agent ADVANCE → authorize(shipowner)
+    ADVANCED --> IN_TRANSIT: AIS underway
+    IN_TRANSIT --> BERTHED: geofence + SOG rule met
+    IN_TRANSIT --> HOLD: AIS dark > 12h / deviation
+    BERTHED --> PAID: verified Velo webhook → treasury fund_escrow
+    PAID --> SETTLED: agent SETTLE → 3× authorize
+    SETTLED --> CLOSED: payees claim; balance_of == 0
+    BERTHED --> DEFAULT: due date + grace passed
+    DEFAULT --> CLOSED: revoke_agent → sweep_on_revoke
+    HOLD --> IN_TRANSIT: ops clears
 ```
 
-#### A. Workflow 1: Invoice Validation & Device Binding
-- **Trigger:** Shipowner submits new freight invoice and e-Waybill.
-- **Agent Action:** 
-  1. Validates invoice format, consignee registration, and invoice SHA-256 hash.
-  2. Queries Noir `agent_registry` to confirm shipowner authorization and verify the agent's spending allowance limit.
-  3. Registers or verifies the vessel's AIS transponder (MMSI: `548123456`, IMO: `9876543`) in Noir `device_registry`.
-- **Output:** Validated tokenization parameters sent to `payment_escrow`.
+### 8.2 Telemetry and berthing rule (simulated)
+- **Feed:** a local simulator replays GeoJSON tracks with no external API, so the demo always works. Ticks come every 2 s in the demo and every 15 min in production.
+- **Origin:** Manila South Harbor (14.580° N, 120.965° E). **Destination geofence:** Port of Cebu, centred at 10.3015° N, 123.9080° E with an 800 m radius. **[confirm the coordinates on a map before the demo]**
+- **Berthed** = inside the geofence **and** SOG ≤ 0.5 kn for 3 consecutive ticks. A vessel anchored outside the geofence must **not** count (this is a test case).
+- **Attestation:** the agent signs `{invoiceId, mmsi, port, berthTimestamp, lat, lng, sog}`. The record and its hash go in the event log, and the hash is shown next to the settlement txs. Nothing is written to `device_registry`.
+- **Honesty note for the pitch:** AIS is self-reported and can be spoofed. Settlement also requires the debtor to pay, and in production we would add terminal discharge data.
 
-#### B. Workflow 2: Maritime AIS Telemetry & Berthing Verification
-- **Trigger:** Continuous telemetry ticks (every 10 seconds in demo / 15 minutes in production).
-- **Telemetry Ingestion:** Receives coordinates:
-  - Manila South Harbor: `14.5800° N, 120.9650° E`
-  - Steaming Route: Sibuyan Sea / Visayan Sea passage.
-  - Port of Cebu Geofence: Center `10.3015° N, 123.9080° E`, Radius $800\text{ meters}$.
-- **Verification Logic:**
-  - Vessel coordinates inside Cebu Port geofence polygon.
-  - Speed Over Ground ($\text{SOG}$) $\le 0.5\text{ knots}$ for $> 3$ consecutive evaluation windows (proving vessel is moored, not just passing by).
-  - Terminal gate-out / container discharge sensor confirmation.
-- **Agent Action:** Signs a cryptographic attestation of delivery and updates `device_registry` status to `DELIVERED`.
+### 8.3 Decision contract
+The model (any tool-calling LLM) receives a structured context and must return exactly this:
 
-#### C. Workflow 3: Autonomous Escrow Settlement & Yield Distribution
-- **Trigger:** Receipt of cryptographically signed Velo webhook (`type: "payment.succeeded"`).
-- **Agent Action:**
-  1. Verifies webhook signature against Velo webhook secret using Web Crypto API.
-  2. Confirms delivery status is `DELIVERED` from Workflow 2.
-  3. Prepares Soroban settlement invocation on `payment_escrow`:
-     - Releases $\text{Principal} + \text{Yield}$ to investor pool.
-     - Releases remaining $\text{Reserve} - \text{Protocol Fee}$ to shipowner.
-     - Transfers protocol fee to treasury.
-  4. Calls `velo.gas.sponsor()` to sponsor the settlement transaction on Stellar Testnet.
-  5. Submits signed transaction to Stellar Testnet and confirms ledger execution.
-
-### 8.2 AI Model & Telemetry Parameters
-
-| Parameter | Specification | Purpose / Rationale |
-|---|---|---|
-| **Agent Engine Core** | TypeScript / Node.js Agent Runner with LangChain / LLM Reasoning Adapter | High-reliability autonomous event loop with typed inputs |
-| **Reasoning Model (Optional NLP)** | Claude 3.5 Sonnet / OpenAI GPT-4o-mini / Local Qwen 2.5 | Analyzes irregular e-Waybill scans or unstructured manifest descriptions |
-| **Telemetry Ingestion Rate** | $10\text{ s}$ intervals (demo simulation) / $15\text{ min}$ (production AIS) | Fast demo progression during pitch while matching real maritime intervals |
-| **Geofence Radius (Cebu Port)** | $800\text{ meters}$ around `10.3015° N, 123.9080° E` | Standard harbor berthing basin tolerance |
-| **Speed Over Ground Threshold** | $\le 0.5\text{ knots}$ | Distinguishes underway maneuvering from active quayside berth |
-| **Minimum Berthing Hold** | 3 consecutive evaluations ($30\text{ s}$ demo / $1\text{ hr}$ prod) | Prevents premature triggers from temporary anchor drops |
-
-### 8.3 Structured Output JSON Schemas
-
-#### Schema A: AIS Berthing Attestation Schema
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "BerthingAttestation",
+  "title": "AgentDecision",
   "type": "object",
-  "required": ["invoiceId", "vesselMMSI", "destinationPort", "berthTimestamp", "coordinates", "sogKnots", "proofHash", "deliveryConfirmed"],
+  "required": ["invoiceId", "decision", "reason", "payouts"],
   "additionalProperties": false,
   "properties": {
     "invoiceId": { "type": "string", "pattern": "^INV-[0-9]{4}-[0-9]{3}$" },
-    "vesselMMSI": { "type": "string", "pattern": "^[0-9]{9}$" },
-    "destinationPort": { "type": "string", "enum": ["CEBU_BASEPORT", "CDO_MACABALAN", "DAVAO_SASA"] },
-    "berthTimestamp": { "type": "string", "format": "date-time" },
-    "coordinates": {
-      "type": "object",
-      "required": ["lat", "lng"],
-      "properties": {
-        "lat": { "type": "number", "minimum": 4.0, "maximum": 22.0 },
-        "lng": { "type": "number", "minimum": 116.0, "maximum": 128.0 }
+    "decision": { "enum": ["ADVANCE", "SETTLE", "HOLD", "DEFAULT"] },
+    "reason": { "type": "string", "maxLength": 280 },
+    "payouts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["role", "amountStroops"],
+        "additionalProperties": false,
+        "properties": {
+          "role": { "enum": ["SHIPOWNER", "LP", "TREASURY"] },
+          "amountStroops": { "type": "string", "pattern": "^[0-9]+$" }
+        }
       }
-    },
-    "sogKnots": { "type": "number", "minimum": 0.0, "maximum": 40.0 },
-    "proofHash": { "type": "string", "pattern": "^0x[a-fA-F0-9]{64}$" },
-    "deliveryConfirmed": { "type": "boolean" }
+    }
   }
 }
 ```
 
-#### Schema B: Escrow Settlement Dispatch Schema
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "SettlementDispatch",
-  "type": "object",
-  "required": ["escrowContractId", "invoiceId", "totalAmountPaid", "disbursements", "settlementTimestamp", "gasSponsorshipId"],
-  "additionalProperties": false,
-  "properties": {
-    "escrowContractId": { "type": "string" },
-    "invoiceId": { "type": "string" },
-    "totalAmountPaid": { "type": "string" },
-    "disbursements": {
-      "type": "object",
-      "required": ["investorPrincipal", "investorYield", "shipownerRebate", "protocolFee"],
-      "properties": {
-        "investorPrincipal": { "type": "string" },
-        "investorYield": { "type": "string" },
-        "shipownerRebate": { "type": "string" },
-        "protocolFee": { "type": "string" }
-      }
-    },
-    "settlementTimestamp": { "type": "string", "format": "date-time" },
-    "gasSponsorshipId": { "type": "string" }
-  }
-}
-```
+The model returns **roles, not addresses**. The executor maps each role to the address stored for the invoice, so the LLM can never send money to an arbitrary wallet. Before submitting, the executor checks:
 
-### 8.4 Fallback & Graceful Degradation
-- **AIS Signal Loss / Transponder Outage:** If the vessel loses satellite AIS connectivity in bad weather (e.g., tropical storms in the San Bernardino Strait), the agent will NOT prematurely fail or forfeit the invoice. It pauses the berthing check and flags a `telemetry_lag` status.
-- **Webhook Failure / Timeout:** If the Velo webhook endpoint experiences transient downtime, the agent falls back to periodic active polling via `velo.paymentIntents.retrieve(paymentIntentId)`.
-- **Gas Station Denial:** If Velo Gas Station returns a policy denial (`daily_cap_exceeded` or rate limit), the agent falls back to funding transaction fees directly from the protocol fallback operator wallet.
-
----
-
-## 9. Data Access, Privacy & Security Architecture
-
-### 9.1 The Redaction & Telemetry Boundary
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Shipowner
-    participant UI as Next.js Web App
-    participant Agent as Autonomous AI Agent
-    participant NoirDR as Noir device_registry
-    participant NoirAR as Noir agent_registry
-    participant NoirPE as Noir payment_escrow
-    participant Velo as Velo SDK & Gateway
-    actor Corporate as Corporate Debtor (FMCG)
-    actor Investor as Liquidity Provider
-
-    Note over Shipowner,Investor: 1. INVOICE TOKENIZATION & INSTANT ADVANCE
-    Shipowner->>UI: Uploads e-Waybill (₱1,000,000, Manila to Cebu, Net-60)
-    UI->>Agent: Extract metadata & sanitize commercial secrets
-    Agent->>NoirAR: Check agent allowance & shipowner verification
-    Agent->>NoirDR: Bind vessel AIS transponder (MMSI: 548123456)
-    Investor->>UI: Supplies ₱850,000 liquidity (85% advance)
-    UI->>NoirPE: Lock liquidity in Escrow (CA5S4S...K7HIX)
-    NoirPE->>Shipowner: Disburse ₱850,000 to Stellar Wallet (Instant Working Capital)
-
-    Note over Agent,NoirDR: 2. AUTONOMOUS JOURNEY MONITORING
-    loop Every 10s Telemetry Tick
-        Agent->>Agent: Ingest AIS feed (GPS, SOG, COG)
-        Agent->>Agent: Check against Port of Cebu Geofence
-    end
-    Agent->>NoirDR: Vessel berthed (SOG < 0.5 kn) -> Set Status = DELIVERED
-
-    Note over Corporate,NoirPE: 3. DEBTOR CHECKOUT & AUTONOMOUS SETTLEMENT
-    UI->>Velo: velo.checkout.sessions.create(₱1,000,000, asset: "USDC")
-    Velo-->>Corporate: Deliver Velo Pay Checkout Link
-    Corporate->>Velo: Pays ₱1,000,000 (via PDAX PHPT / USDC)
-    Velo->>UI: Webhook: payment.succeeded (HMAC Verified)
-    UI->>Agent: Notify settlement payment confirmed
-    Agent->>Velo: velo.gas.sponsor(settlementInvocationXdr)
-    Agent->>NoirPE: Execute settle()
-    NoirPE->>Investor: ₱880,000 (₱850,000 principal + ₱30,000 yield)
-    NoirPE->>Shipowner: ₱115,000 (Remaining balance rebate)
-    NoirPE->>UI: ₱5,000 Protocol Fee to Treasury
-```
-
-### 9.2 Asset & Field Classification Matrix
-
-| Field | Classification | Allowed in Public Telemetry? | Encryption / Redaction Method |
-|---|---|:---:|---|
-| **Invoice Number & Amount** | Financial Data | Yes (Aggregated) | Stored in contract state (unredacted) |
-| **Vessel IMO / MMSI** | Public Maritime Identifier | Yes | Verbatim (public international standard) |
-| **Vessel GPS Coordinates** | Public Navigation Data | Yes | Broadcasted publicly over standard VHF AIS |
-| **Commercial Cargo Specifics (SKU / Pricing)** | Commercial Proprietary | **NO (STRICT CONFIDENTIAL)** | Redacted; only cargo category (e.g. "Dry Goods Container") exposed |
-| **Corporate Shipper Tax ID / PII** | Strict Enterprise Secret | **NO (STRICT CONFIDENTIAL)** | Salted SHA-256 hash stored on-chain |
-| **Shipowner / Agent Private Keys** | Root Cryptographic Secrets | **NO (NEVER EXPOSED)** | Kept in server-side KMS / secure environment variables |
-| **Velo Webhook Signing Secret** | API Infrastructure Secret | **NO (NEVER EXPOSED)** | Server-side environment variable only |
-
-### 9.3 Threat Modeling & Mitigations
-
-| Threat | Description | Required Mitigation |
+| Decision | Preconditions (all checked in code) | Allowed payouts |
 |---|---|---|
-| **T-1: GPS / AIS Spoofing** | Shipowner spoofs false AIS coordinates to simulate arrival in Cebu without sailing. | **Multi-factor attestation:** Agent correlates AIS coordinates with harbor speed thresholds ($\text{SOG} \le 0.5\text{ kn}$) and validates against Cebu Port Authority terminal gate logs. Final settlement cannot execute without corporate client payment anyway. |
-| **T-2: Double-Factoring Fraud** | Shipowner pledges the same e-Waybill across multiple platforms to borrow double. | **Unique On-Chain Hash:** e-Waybill document hash is registered in Noir `device_registry`. Any second submission with the same hash is rejected on-chain. |
-| **T-3: Rogue AI Agent Key Compromise** | Attacker compromises the agent's signing key to siphon escrowed funds. | **Noir `agent_registry` Constraints:** The agent can only execute methods on `payment_escrow` and has a strictly enforced maximum spending allowance. `payment_escrow` only disburses to hardcoded investor/shipowner addresses, not arbitrary attacker wallets. |
-| **T-4: Webhook Replay / Forgery** | Attacker sends fake `payment.succeeded` webhook to trigger premature escrow payout. | **Web Crypto Signature Verification:** `verifyWebhookSignature` computes HMAC-SHA256 signature using the shared Velo webhook secret and enforces a 300-second timestamp tolerance window. |
-| **T-5: Corporate Debtor Default** | Corporate client fails to pay after 60 days. | **Reserve Buffer & Risk Pool:** The 15% reserve remains held; the protocol maintains a 1st-loss insurance pool. In production, legally assigned rights under RA 8556 permit formal collection against the corporate debtor. |
+| `ADVANCE` | State `FUNDED`, `balance_of ≥ advance`, AIS underway, waybill hash registered by us | `SHIPOWNER = α·V` |
+| `SETTLE` | State `PAID`, webhook verified, amount == V, berthing attestation present | `LP = α·V + y·V`, `SHIPOWNER = rebate`, `TREASURY = f·V`, summing to exactly V |
+| `HOLD` | Any precondition fails or an anomaly is flagged | none |
+| `DEFAULT` | Due date + grace passed, no payment | none (ops runs revoke and sweep) |
+
+If the model's payouts differ from the amounts computed in code, the executor **rejects the decision and logs it**. The model explains the decision, and the numbers come from code.
+
+### 8.4 Degradation
+- **AIS gap:** `HOLD` with reason `telemetry_lag`. The invoice is never forfeited automatically.
+- **Webhook missing:** poll the payment status (`velo.paymentIntents.retrieve` **[confirm]**), and offer a "re-poll" button in the ops panel.
+- **Gas Station refusal** (e.g., `contract_not_whitelisted` or a daily cap): the relayer account pays the fee in testnet XLM.
+- **LLM down or invalid output:** the rules engine makes the same decision deterministically and the log is marked `fallback`.
 
 ---
 
-## 10. Smart Contract & Settlement Architecture
+## 9. Security & Data
 
-### 10.1 Noir Testnet Soroban Contracts
-The protocol directly integrates three deployed Noir Testnet contracts on the Stellar Testnet:
+### 9.1 Data classification
 
-1. **`agent_registry` (`CBTDMJVCFQDIVWZBKAKZ2FQ3UEJNAAUFYCTJ3E4ON2MYXPLPSIXQ25JZ`)**
-   - **Role:** Identity, role validation, and spending governance.
-   - **Key Methods:**
-     - `is_authorized(agent_address: Address, role: Symbol) -> bool`: Verifies AI Agent authorization.
-     - `get_allowance(agent_address: Address) -> i128`: Returns the agent's remaining programmatic spending limit.
-     - `verify_shipowner(owner_address: Address) -> bool`: Confirms shipowner identity and compliance status.
-2. **`device_registry` (`CB4DPMGOA374JIB2ZVD4AHW5GJKQUYNOFGRYNOJ75EFH2KCJSMHOWIRA`)**
-   - **Role:** Physical asset mapping and real-world proof storage.
-   - **Key Methods:**
-     - `register_device(device_hash: BytesN<32>, owner: Address, device_type: Symbol)`: Binds vessel MMSI/AIS transponder or container GPS.
-     - `update_telemetry_status(device_hash: BytesN<32>, status: Symbol, location_hash: BytesN<32>)`: Agent logs voyage events (`UNDERWAY`, `BERTHED`, `DELIVERED`).
-     - `get_device_status(device_hash: BytesN<32>) -> (Symbol, Address)`: Reads verified delivery status.
-3. **`payment_escrow` (`CA5S4S7QGHJHJWVJBYL3CXZXZTNGKXMNZVDAEQNN7NUXFP4D7BYK7HIX`)**
-   - **Role:** Vault locking, advance payout dispatch, and multi-party settlement.
-   - **Key Methods:**
-     - `create_invoice_escrow(invoice_id: Symbol, total_amount: i128, advance_amount: i128, shipowner: Address, investor: Address)`: Creates escrow position.
-     - `disburse_advance(invoice_id: Symbol)`: Sends 85% advance payout directly to the shipowner.
-     - `settle_invoice(invoice_id: Symbol, total_paid: i128)`: Triggered by AI Agent upon Velo payment confirmation. Disburses principal + yield to investor, remaining rebate to shipowner, and fee to treasury.
+| Data | Where it lives | Public? |
+|---|---|---|
+| Invoice hash, amounts, payout txs | On-chain (escrow events) | Yes |
+| Vessel MMSI/IMO, positions | Event log; AIS is public by nature | Yes |
+| Cargo SKU / pricing, debtor tax ID | Off-chain DB; only a salted hash is used anywhere public | **No** |
+| Agent, treasury and custodial wallet secrets | Server env / encrypted at rest | **Never** |
+| Velo API key and webhook secret | Server env only | **Never** |
 
-### 10.2 Velo SDK Integration Architecture (`@carts1024/velo-sdk@0.1.0-alpha.4`)
-The protocol uses the official Velo TypeScript SDK for all payments and infrastructure operations:
+### 9.2 Threats
+
+| Threat | Mitigation |
+|---|---|
+| **T-1 AIS spoofing** to fake arrival | Settlement also needs the debtor's payment. Use the geofence + SOG + dwell rule. In production, cross-check terminal data. State this limit openly. |
+| **T-2 Double-factoring** | Register the waybill hash in `device_registry` and confirm that a duplicate is rejected (S3). Also enforce a unique hash in our DB. Cross-platform protection only works if other lenders check the same registry; say so. |
+| **T-3 Agent key compromise** | Per-payment cap and expiry in `agent_registry`; payees fixed by role in code; one invoice per device keeps the blast radius to one escrow; ops can `revoke_agent` at once. **Note:** the cap applies per payment, not to a running total, so an attacker could make repeated capped payments until the escrow is empty. The off-chain daily limit and alerts cover that. |
+| **T-4 Forged or replayed webhook** | Verify the signature over the raw body, enforce a 300 s timestamp window, de-duplicate by delivery ID, and check that the amount and invoice ID match the open session. |
+| **T-5 Double payout from retries** | Deterministic nonces (§10.4) and a single in-flight payment per agent. |
+| **T-6 Debtor default** | The LP takes the loss in the MVP and sees it disclosed in the investor UI. Later: a first-loss reserve and legal assignment of the receivable. |
+
+### 9.3 Compliance note (not legal advice)
+In the Philippines, factoring as a business is generally a regulated financing activity, and selling invoice-backed tokens to investors may be treated as a securities offering. Both fall under the SEC. The pitch should present this as a Testnet prototype and list "regulatory pathway (SEC financing company licence / sandbox)" in the roadmap.
+
+---
+
+## 10. Contracts & Integration
+
+### 10.1 Contract interface we rely on
+These come from other teams reading the deployed Rust source. **Confirm them against the source and the generated bindings on Nov 5 (S1).**
+
+| Contract | Call | Notes |
+|---|---|---|
+| `device_registry` | `register(owner_wallet, device_hash, agent)` | Owner = treasury. `device_hash = invoice_hash`. Exact args **[confirm]**. |
+| `agent_registry` | `register_agent(owner_wallet, device_hash, agent, max_amount, asset, expires_at)` | `max_amount` caps **each** payment; `expires_at` is compared to the ledger time (a payment exactly at expiry is still valid). |
+| | `check_payment(device_hash, agent, asset, amount)` | Called inside `authorize`; rejects over-cap, expired or wrong-asset payments. |
+| | `revoke_agent(...)` | Stops future `authorize` calls. |
+| `payment_escrow` | `fund_escrow(token, wallet, device_hash, amount)` | `wallet.require_auth()`. **Any wallet may fund any device. The token is fixed per device at first funding.** |
+| | `authorize(agent, device_hash, merchant, asset, amount: i128, nonce: u64)` | `agent.require_auth()` + `check_payment`. Creates a pending balance for `merchant`. |
+| | `claim(token, merchant)` | Signed by the merchant; pays out everything pending for that merchant across all devices. |
+| | `defund_escrow(...)`, `sweep_on_revoke(token, device_hash, agent)` | Owner only. Order: `revoke_agent` → `sweep_on_revoke` → (optional) device revoke. Never revoke the device while its balance is above 0. |
+| | `balance_of`, `pending_balance` (+ `get_policy` on the registry) | Read calls for the dashboard and the invariant checks. |
+| Events | `fund`, `authorize`, `claim`, `defund`, `sweep` | Drive the dashboard from these. |
+
+### 10.2 Mapping factoring onto the escrow
+
+| Factoring concept | On-chain primitive |
+|---|---|
+| Invoice | Device in `device_registry` (`device_hash = sha256(waybill)`) owned by the treasury |
+| Agent's mandate for this invoice | `agent_registry` policy: `max_amount = α·V + y·V` (largest single payout), `asset = XLM SAC`, `expires_at = due date + grace` |
+| LP advance | LP `fund_escrow(token, lp_wallet, invoice_hash, α·V)` → agent `authorize(…, shipowner, α·V, n)` → shipowner `claim` |
+| Debtor payment | Velo checkout → treasury receives it → treasury `fund_escrow(token, treasury, invoice_hash, V)` |
+| Settlement | Agent `authorize` ×3 with nonces n+1, n+2, n+3 → LP, shipowner, treasury each `claim` |
+| Default / exit | `revoke_agent` → treasury `sweep_on_revoke` |
+| Over-cap guardrail demo | Agent `authorize(…, shipowner, V, n+k)` with `V > max_amount` → reverts in `check_payment` |
+
+> Because `claim` pays out across all devices, use **separate demo wallets per role** so each claim is easy to read on the explorer.
+
+### 10.3 Demo currency (decision D-1)
+- **Default:** settle in **testnet XLM** through the native asset contract (`Asset.native().contractId(Networks.TESTNET)`). This is known to work with `payment_escrow`.
+- Show PHP in the UI at a **fixed demo rate, 1 XLM = ₱1,000**, with a visible "demo rate" label. A ₱1,000,000 invoice is therefore 1,000 XLM, which a Friendbot-funded account can hold.
+- *Alternative:* issue a test asset (`tPHP`) from the treasury and use its SAC. That allows 1:1 peso amounts but adds trustline setup. Pick one on Nov 5 and don't switch.
+
+### 10.4 Nonces & idempotency
+- One nonce sequence per (invoice device, agent). Nonces must be **strictly increasing** (gaps are allowed). If a higher nonce lands first, every lower one fails, so **only one `authorize` per agent can be in flight**. Use a per-agent queue or lock.
+- Store `(invoice_id, step) → nonce` before submitting. On retry, reuse the same nonce. If the tx already landed, the retry fails harmlessly.
+- Webhooks: de-duplicate by the Velo delivery/event ID **before** any side effect.
+
+### 10.5 Velo integration
+Use only calls we can confirm in the SDK README or types on Nov 5. Calls other teams have used are listed first.
 
 ```typescript
-import { Velo, verifyWebhookSignature } from "@carts1024/velo-sdk";
+import { Velo } from "@carts1024/velo-sdk";
 
-// 1. Initialize Client
-export const velo = new Velo({
-  apiKey: process.env.VELO_API_KEY!,
-  environment: "testnet",
-  timeoutMs: 15_000,
-  maxRetries: 2,
-});
+export const velo = new Velo({ apiKey: process.env.VELO_API_KEY!, environment: "testnet" }); // [confirm option names]
 
-// 2. Generate Corporate Debtor Checkout Session
-export async function createFreightInvoiceCheckout(invoice: InvoiceRecord) {
-  const session = await velo.checkout.sessions.create({
-    amount: (invoice.faceValue / 100).toFixed(2), // e.g. "1000000.00"
-    asset: "USDC",
-    description: `Freight Settlement: Invoice ${invoice.id} (Manila to Cebu)`,
-    successUrl: `${process.env.APP_URL}/checkout/success?invoiceId=${invoice.id}`,
-    cancelUrl: `${process.env.APP_URL}/checkout/cancel?invoiceId=${invoice.id}`,
-    anchor: "pdax", // Support Philippine Peso / PDAX rails
+// Debtor checkout. The amount is in the CHECKOUT asset, not PHP.
+export async function createDebtorCheckout(inv: Invoice) {
+  return velo.checkout.sessions.create({
+    amount: toAssetAmount(inv.faceValueStroops), // e.g. "1000.0000000" XLM for ₱1,000,000 at the demo rate
+    asset: "XLM",                                // [confirm supported assets]
+    description: `Freight invoice ${inv.id} (Manila → Cebu)`,
+    successUrl: `${process.env.APP_URL}/pay/success?invoiceId=${inv.id}`,
+    cancelUrl: `${process.env.APP_URL}/pay/cancel?invoiceId=${inv.id}`,
   });
-  return session;
+  // v1.0's `anchor: "pdax"` is removed: it isn't a documented option.
 }
 
-// 3. Velo Gas Station Fee Sponsorship
-export async function sponsorSorobanInvocation(signedTransactionXdr: string, operationId: string) {
-  const reservation = await velo.gas.sponsor(signedTransactionXdr, {
-    idempotencyKey: `freight_settle:${operationId}`,
-  });
-  return reservation;
+// Fee sponsorship: submit, then wait. Only a final "succeeded" counts.
+export async function submitSponsored(signedXdr: string, opId: string) {
+  const r = await velo.gas.sponsorAndSubmit(signedXdr, { idempotencyKey: `vismin:${opId}` });
+  return velo.gas.waitForResult(r); // [confirm signature]
 }
 
-// 4. Secure Webhook Verification
-export async function handleVeloWebhook(request: Request) {
-  const payload = await request.text();
-  const signature = request.headers.get("x-velo-signature")!;
-  const event = await verifyWebhookSignature({
-    payload,
-    signature,
-    secret: process.env.VELO_WEBHOOK_SECRET!,
-    toleranceSeconds: 300,
-  });
+// Webhook: verify the RAW body; header names are [confirm] (seen: x-velo-signature, x-velo-delivery)
+export async function handleVeloWebhook(req: Request) {
+  const raw = await req.text();
+  const event = await Velo.webhooks.verify(raw, req.headers.get("x-velo-signature")!, process.env.VELO_WEBHOOK_SECRET!); // [confirm]
+  // de-dupe on delivery id, match session → invoice, check amount, then enqueue treasury fund_escrow
   return event;
 }
 ```
 
-### 10.3 Capital & Yield Flow Mathematics
+**Open (S4):** which address and asset receive a Velo checkout payment (`receiverAddress`)? The plan is that the payment lands in the treasury and the treasury then calls `fund_escrow`. If Velo can pay directly to a contract call, we can drop that hop later.
 
-#### Mathematical Formulas
-- **Face Value ($V$):** Full nominal freight invoice amount owed by corporate debtor.
-- **Advance Rate ($\alpha$):** Immediate working capital ratio supplied to shipowner (fixed at $85\%$ or $0.85$).
-- **Investor Yield Rate ($y$):** Flat return paid to liquidity providers over the 60-day invoice tenor (fixed at $3.0\%$ or $0.03$ flat, representing $\approx 18.25\%$ annualized APY).
-- **Protocol Fee Rate ($f$):** Retained protocol revenue (fixed at $0.5\%$ or $0.005$).
-- **Shipowner Reserve Rebate ($\rho$):** Balance returned to shipowner upon settlement:
-  $$\rho = V - (\alpha \cdot V) - (y \cdot V) - (f \cdot V) = V \cdot (1 - \alpha - y - f)$$
+### 10.6 Math
 
-#### Numerical Walkthrough (₱1,000,000 Freight Run)
+Let V = face value, α = 0.85 (advance), y = 0.03 of V (LP yield), f = 0.005 of V (protocol fee).
 
-| Stage | Payer / Source | Recipient | Amount (PHP / PHPT / USDC) | % of Face Value | Economic Purpose |
-|---|---|---|---|:---:|---|
-| **Step 1: Upfront Advance** | Investor Pool | Shipowner Wallet | **₱850,000.00** | $85.0\%$ | Immediate cash for bunker fuel & port terminal dues |
-| **Step 2: Escrow Buffer Locked** | `payment_escrow` | Locked in Contract | **₱150,000.00** | $15.0\%$ | Held as collateral reserve until corporate settlement |
-| **Step 3: Corporate Repayment** | Corporate Debtor | `payment_escrow` | **₱1,000,000.00** | $100.0\%$ | Full settlement via Velo Pay Checkout link |
-| **Step 4A: LP Return** | `payment_escrow` | Investor Wallet | **₱880,000.00** | $88.0\%$ | ₱850,000 principal return + ₱30,000 flat yield ($3.0\%$) |
-| **Step 4B: Shipowner Rebate** | `payment_escrow` | Shipowner Wallet | **₱115,000.00** | $11.5\%$ | Remaining 15% reserve minus factor yield and fee |
-| **Step 4C: Protocol Fee** | `payment_escrow` | Protocol Treasury | **₱5,000.00** | $0.5\%$ | Protocol revenue for maintenance and gas subsidization |
-| **Total Invariant Balance** | — | — | **₱1,000,000.00** | $100.0\%$ | Exact zero-loss conservation verified |
+- Advance = ⌊α·V⌋
+- LP repayment = Advance + ⌊y·V⌋
+- Fee = ⌊f·V⌋
+- Shipowner rebate = V − LP repayment − Fee *(absorbs rounding)*
 
----
+**Yield, stated correctly:** the LP deploys α·V and earns y·V, so the return on capital is y/α = 3.53% over 60 days, about **21.5% simple annualized** (3.53% × 365/60). Quote that figure, not 18.25%.
 
-## 11. Functional Requirements Matrix
+| Step | From → To | Demo ₱ | Testnet XLM (₱1,000 = 1 XLM) |
+|---|---|---:|---:|
+| LP funds the escrow | LP → escrow | 850,000 | 850 |
+| Advance | escrow → shipowner (`authorize` + `claim`) | 850,000 | 850 |
+| Debtor pays | debtor → Velo → treasury → escrow | 1,000,000 | 1,000 |
+| LP repayment | escrow → LP | 880,000 | 880 |
+| Rebate | escrow → shipowner | 115,000 | 115 |
+| Fee | escrow → treasury | 5,000 | 5 |
+| **Check** | `balance_of(invoice)` after settlement | **0** | **0** |
 
-| Req ID | Task ID | Feature Area | User Story / Requirement Statement | Priority | Verification Method |
-|---|---|---|---|:---:|---|
-| **FR-01** | `NV-M0-01` | Contracts | As a developer, I want verified bindings for Noir’s `device_registry`, `agent_registry`, and `payment_escrow` on Stellar Testnet so transactions can execute. | P0 | Contract connection unit tests (`contracts.test.ts`) |
-| **FR-02** | `NV-M0-02` | Shipowner Portal | As a shipowner, I want to submit an e-Waybill and invoice so I can mint an RWA debt position and register my vessel's AIS transponder. | P0 | UI upload & tokenization integration test |
-| **FR-03** | `NV-M0-03` | Investor Pool | As an LP, I want to view active freight invoice pools and fund 85% advance capital in one click. | P0 | Pool funding transaction test (`funding.test.ts`) |
-| **FR-04** | `NV-M0-04` | Instant Advance | As a shipowner, I want to receive the 85% advance in my Stellar wallet within 5 seconds of funding so I can buy bunker fuel. | P0 | Advance disbursement latency test (`payout.test.ts`) |
-| **FR-05** | `NV-M0-05` | Velo Checkout | As a platform operator, I want to generate Velo Pay checkout sessions via `@carts1024/velo-sdk` for corporate debtors. | P0 | Velo checkout API test (`velo-checkout.test.ts`) |
-| **FR-06** | `NV-M0-06` | Gas Sponsorship | As a user, I want my Stellar contract transactions sponsored by Velo Gas Station so I do not need to acquire XLM for gas. | P0 | Gas sponsorship test (`gas-sponsor.test.ts`) |
-| **FR-07** | `NV-M0-07` | AIS Telemetry | As an AI Agent, I want to stream vessel AIS coordinates and detect when SOG $\le 0.5\text{ kn}$ inside the Port of Cebu geofence. | P0 | Geofence state-machine simulation test (`agent-berthing.test.ts`) |
-| **FR-08** | `NV-M0-08` | Webhook Receiver | As a platform operator, I want incoming Velo webhooks cryptographically verified using Web Crypto API to prevent spoofing. | P0 | Webhook HMAC signature verification test |
-| **FR-09** | `NV-M0-09` | Autonomous Settlement | As an AI Agent, I want to automatically call `payment_escrow` to settle the invoice upon valid payment webhook and delivery proof. | P0 | End-to-end settlement cycle test (`settlement.test.ts`) |
-| **FR-10** | `NV-M0-10` | Real-Time UI | As a hackathon judge, I want to watch the vessel journey, escrow status changes, and transaction hashes in real time. | P0 | Full-system demo visual rehearsal |
-| **FR-11** | `NV-M1-01` | Multi-Port Routes | As an operator, I want to toggle between Manila $\rightarrow$ Cebu, Cebu $\rightarrow$ CDO, and Manila $\rightarrow$ Davao routes. | P1 | Multi-route simulation unit test |
-| **FR-12** | `NV-M1-02` | Risk Score Slider | As an investor, I want to dynamically preview how debtor credit scores alter factoring discount yields. | P1 | Risk model calculation test |
+Agent cap for this invoice: `max_amount = 880 XLM`. The guardrail demo tries 1,000 XLM and is rejected.
 
 ---
 
-## 12. User Experience & Interaction Requirements
+## 11. Hackathon Requirement Map
 
-### 12.1 Primary User Journey Walkthrough (The Winning Demo Loop)
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Judge as Hackathon Judge / Evaluator
-    participant App as Next.js Protocol App
-    participant Agent as Autonomous AI Agent
-    participant Velo as Velo Pay Gateway
-    participant Stellar as Stellar Testnet (Noir Contracts)
-
-    Judge->>App: 1. Launch App & View Dashboard
-    Judge->>App: 2. Click "Tokenize Inter-Island Invoice" (Manila -> Cebu, ₱1,000,000)
-    App->>Stellar: Register Vessel AIS (device_registry) & Mint RWA Escrow (payment_escrow)
-    Stellar-->>App: Confirmed on Ledger (Tx Hash displayed)
-    Judge->>App: 3. Switch to Investor View & Click "Fund 85% Advance (₱850,000)"
-    App->>Stellar: Lock Liquidity in payment_escrow
-    Stellar->>App: Disburse ₱850,000 instantly to Shipowner Wallet (< 5s)
-    Judge->>App: 4. Click "Start Autonomous Voyage Simulation"
-    loop Voyage Telemetry Progression
-        Agent->>App: Stream AIS Telemetry (Manila -> Sibuyan Sea -> Port of Cebu)
-    end
-    Agent->>Stellar: Berthing Confirmed! (SOG < 0.5 kn) -> Update device_registry
-    Judge->>App: 5. Click "Simulate Corporate Debtor Velo Pay Settlement"
-    App->>Velo: Generate Velo Pay Checkout Link (₱1,000,000)
-    Velo->>App: Dispatch Webhook (payment.succeeded)
-    App->>Agent: Webhook Verified via Web Crypto API
-    Agent->>Velo: Sponsor Gas via velo.gas.sponsor()
-    Agent->>Stellar: Execute payment_escrow.settle()
-    Stellar-->>App: Settlement Distributed:
-    Note over App: • ₱880,000 to Investor (₱30,000 yield)<br/>• ₱115,000 to Shipowner (Rebate)<br/>• ₱5,000 to Protocol Treasury
-    App->>Judge: All Stellar Tx Hashes & Ledgers Rendered with Green Badges
-```
-
-### 12.2 UX Rules & Design System Invariants
-- **Real-Time Visual State Progression:** The UI must display five distinct status badges: `TOKENIZED` $\rightarrow$ `FUNDED` $\rightarrow$ `IN_TRANSIT` $\rightarrow$ `BERTHED` $\rightarrow$ `SETTLED`.
-- **Dual Perspective Toggle:** One-click header toggle between **Shipowner View** (focus on cash advance received and bunker liquidity) and **Investor View** (focus on APY, capital deployment, and yield recovery).
-- **Interactive Maritime Map:** Interactive map of the Philippine archipelago rendering the Manila South Harbor to Port of Cebu route with vessel icon moving along the nautical shipping lane.
-- **Inspectable Proof Modals:** Clicking any transaction or attestation card opens a modal displaying the exact Soroban contract ID, Stellar Testnet transaction hash, and Velo webhook signature payload.
-- **Zero Blank States:** Pre-load realistic Philippine shipping sample data (MV *Trans-Asia 12*, 2GO Freight Express, San Miguel Brewery cargo manifest) so the demo can be exercised immediately without manual typing.
+| Requirement | Where we meet it |
+|---|---|
+| Agent decides / makes the payment | Settlement agent issues `ADVANCE`/`SETTLE` and signs `authorize` itself (§8) |
+| Built with Velo | Checkout sessions, verified webhooks, Gas Station sponsorship (§10.5) |
+| Uses `device_registry` | Each invoice is a registered device (§10.2) |
+| Uses `agent_registry` | Per-invoice cap, asset and expiry; over-cap rejection shown live |
+| Uses `payment_escrow` | `fund_escrow`, `authorize`, `claim`, `sweep_on_revoke` |
+| Latest Testnet contracts | Addresses in the metadata; re-confirm against the hackathon form |
 
 ---
 
-## 13. System Architecture & Technology Stack
+## 12. Functional Requirements
 
-### 13.1 Technology Stack Matrix
-
-| Layer | Chosen Technology | Version / Spec | Selection Justification |
-|---|---|---|---|
-| **Frontend Framework** | Next.js (App Router) + React | `15.x` / `16.x` (TypeScript) | Fast responsive UI, server actions, instant component rendering |
-| **Styling & Icons** | Tailwind CSS + Lucide Icons | `v3.4+` | Modern maritime-fintech aesthetic, responsive mobile & desktop |
-| **Velo Payments & Gas** | `@carts1024/velo-sdk` | `0.1.0-alpha.4` | Official Velo SDK for checkout sessions, gas sponsorship, and webhooks |
-| **Smart Contracts** | Soroban Rust Smart Contracts on Stellar | Stellar Testnet Protocol 22 | Ultra-fast 3s finality, sub-penny fees, native Noir ecosystem deployment |
-| **Blockchain SDK** | `@stellar/stellar-sdk` | `^13.0.0` | Official client for Stellar transaction building and contract invocation |
-| **Autonomous Agent Engine** | Node.js Agent Event Loop | TypeScript / Node 20+ | Fast asynchronous telemetry processing, geofencing, and contract dispatch |
-| **Telemetry Simulator** | Custom Maritime Telemetry Engine | GeoJSON + Great-Circle Math | Simulates authentic Philippine sea route coordinates, speed, and heading |
-| **Signature Cryptography** | Web Crypto API (`crypto.subtle`) | Standard W3C Spec | Zero-dependency, ultra-fast HMAC-SHA256 signature verification |
-
-### 13.2 Network Boundary & Isolation Architecture
-- **Stellar RPC Endpoint:** Interacts strictly with Stellar Testnet RPC (`https://soroban-testnet.stellar.org`).
-- **Velo API Endpoint:** Connects to Velo Build API (`https://www.velo-build.dev`).
-- **Serverless Webhook Handler:** Secure Next.js route `/api/webhooks/velo` rejecting any payload without valid HMAC-SHA256 signature and timestamp within 300 seconds.
-- **Air-Gapped Telemetry Simulation:** All demo AIS telemetry runs within a self-contained simulation engine with zero external API dependencies, guaranteeing 100% demo uptime without risk of external rate-limiting.
+| ID | Area | Requirement | P | Acceptance check |
+|---|---|---|:-:|---|
+| FR-01 | Chain | Chain service wraps every call in §10.1 behind one module | P0 | Script runs the full lifecycle on Testnet and prints tx links |
+| FR-02 | Tokenize | Shipowner submits a waybill; the system registers the device and agent policy | P0 | Device and policy are readable on-chain; re-submitting the same waybill fails |
+| FR-03 | Fund | LP funds the advance with one click | P0 | `balance_of(invoice) == α·V` |
+| FR-04 | Advance | Agent advances to the shipowner after the advance gate | P0 | `authorize` tx + `claim` tx; shipowner balance increases |
+| FR-05 | Telemetry | Simulator plus berthing rule | P0 | Berth detected on 3 routes; the offshore-anchor case is not |
+| FR-06 | Checkout | Debtor checkout session created for an invoice | P0 | The returned `checkoutUrl` opens and payment completes on Testnet |
+| FR-07 | Webhook | Verified, de-duplicated webhook moves the invoice to `PAID` | P0 | Forged, stale and duplicate deliveries are rejected in tests |
+| FR-08 | Settle | Agent settles with 3 capped payouts summing to V | P0 | Escrow balance is 0; three `authorize` events; claims succeed |
+| FR-09 | Guardrail | Over-cap payment is rejected on-chain | P0 | Failed tx hash shown in the UI |
+| FR-10 | Gas | Calls are sponsored by Gas Station, with relayer fallback | P0 | Shipowner and LP accounts spend 0 XLM on fees |
+| FR-11 | Dashboard | Badges, decision log with reasons, explorer links | P0 | Every step in the demo has a clickable tx |
+| FR-12 | Default | Revoke and sweep after the due date | P1 | `sweep` event; treasury balance restored |
+| FR-13 | Routes | Route switcher with a delay scenario | P1 | — |
 
 ---
 
-## 14. Evaluation & Benchmarking Strategy
+## 13. UX
 
-### 14.1 Synthetic Maritime Dataset
-- **Sample Invoices:** Synthetic e-Waybills based on real Philippine shipping routes:
-  - Route 1: Manila South Harbor $\rightarrow$ Port of Cebu (MV *VisMin Pioneer*, ₱1,000,000 Net-60 invoice for San Miguel Beverage containers).
-  - Route 2: Port of Cebu $\rightarrow$ Cagayan de Oro Macabalan Port (MV *Mindanao Express*, ₱750,000 Net-45 invoice for Nestlé food supply).
-  - Route 3: Manila $\rightarrow$ Davao Sasa Wharf (MV *Archipelago Star*, ₱1,500,000 Net-90 invoice for Universal Robina raw materials).
-- **Edge Case Coverage:** Simulates typhoons causing vessel idling in the Visayan Sea, temporary anchor stops, and corporate debtor delayed payments.
+- **Badges:** `TOKENIZED → FUNDED → ADVANCED → IN_TRANSIT → BERTHED → PAID → SETTLED`, plus `HOLD` and `DEFAULT` in amber/red.
+- **Role switcher** in the header: Shipowner / Investor / Debtor / Ops. Each view uses its own demo wallet.
+- **Decision cards:** decision, one-line reason, computed amounts, nonce, tx link. Clicking a card opens the raw decision JSON and the attestation.
+- **Demo-rate label** wherever an amount appears in PHP.
+- **Seed data uses fictional names:** e.g., *MV VisMin Pioneer* (Manila→Cebu, ₱1,000,000, Net-60) shipping for *"Isla Beverages Corp."*; *MV Mindanao Express* (Cebu→CDO, ₱750,000, Net-45); *MV Archipelago Star* (Manila→Davao, ₱1,500,000, Net-90).
+- **No blank states:** every screen works from the seed data without typing.
 
-### 14.2 Evaluation Metrics & Gates
-
-```text
-+------------------------------------+------------------+-----------------------------------------+
-| Evaluation Metric                  | Acceptance Gate  | Action on Gate Failure                  |
-+------------------------------------+------------------+-----------------------------------------+
-| Escrow Balance Conservation        | 100.00% Exact    | Fatal bug: halt settlement dispatch     |
-| Advance Payout Latency             | <= 5.0 seconds   | Optimize RPC calls or parallelize       |
-| Velo Webhook Signature Accuracy    | 100% Pass/Reject | Reject webhook; audit shared secret     |
-| Gas Station Sponsorship Success    | >= 99%           | Fallback to operator transaction fee    |
-| Geofence Berthing Detection        | 100% Detection   | Adjust berthing radius and SOG filter   |
-+------------------------------------+------------------+-----------------------------------------+
-```
+### Demo script (~90 s)
+1. Shipowner tokenizes the invoice (device and policy tx links appear).
+2. Investor funds ₱850k; the agent explains its `ADVANCE` decision; the advance tx and the claim appear.
+3. Ship sails on the map; it berths at Cebu, and the attestation card appears.
+4. Debtor pays through the Velo checkout; the webhook is verified and the escrow is funded.
+5. The agent tries a single ₱1M payout to the shipowner and **the chain rejects it**.
+6. The agent explains its `SETTLE` decision; three payouts and claims follow, and the escrow balance reads **0**.
 
 ---
 
-## 15. Testing & Quality Assurance Plan
+## 14. Architecture & Stack
 
 ```mermaid
 graph TD
-    T1[1. Unit Tests: Factoring Math & Webhook Crypto] --> T2[2. Integration Tests: Velo SDK & Stellar RPC]
-    T2 --> T3[3. Contract State Tests: Noir Testnet Registry & Escrow]
-    T3 --> T4[4. E2E Agent Simulation: Full Tokenize to Settle Loop]
+  subgraph Clients
+    SO[Shipowner portal] --> API
+    LP[Investor portal] --> API
+    OPS[Ops dashboard] --> API
+    DEB[Debtor] --> VCO[Velo hosted checkout]
+  end
+  subgraph Backend [Next.js route handlers / Node]
+    API[API + event log] --> AG[Settlement agent: LLM → decision JSON]
+    AG --> EX[Deterministic executor: checks, nonces, queue]
+    SIM[AIS simulator] --> AG
+    WH[/api/webhooks/velo/] --> API
+    VCO -- payment.succeeded --> WH
+    EX --> CS[Chain service]
+    CS -- sponsorAndSubmit --> GS[Velo Gas Station]
+  end
+  subgraph Stellar Testnet
+    CS --> DR[device_registry]
+    CS --> AR[agent_registry]
+    CS --> PE[payment_escrow]
+  end
 ```
 
-1. **Unit Tests:**
-   - Factoring financial calculations: Verify exact integer math for ₱1M invoice ($\text{Advance} = ₱850\text{k}$, $\text{Yield} = ₱30\text{k}$, $\text{Rebate} = ₱115\text{k}$, $\text{Fee} = ₱5\text{k}$).
-   - Web Crypto signature validator: Test valid signatures pass and forged/expired signatures throw `VeloWebhookSignatureVerificationError`.
-2. **Integration Tests:**
-   - Velo SDK checkout creation: Test `velo.checkout.sessions.create()` returns valid `checkoutUrl` and `paymentIntentId`.
-   - Velo Gas Station: Test `velo.gas.sponsor()` successfully reserves fee exposure for Testnet Soroban transaction.
-3. **Contract Boundary Tests:**
-   - Query Noir `device_registry` and verify device hash mapping.
-   - Query Noir `agent_registry` and verify agent authorization and remaining allowance.
-   - Validate `payment_escrow` state transitions from `LOCKED` to `SETTLED`.
-4. **End-to-End Live Loop Rehearsal:**
-   - Execute the complete 5-step user journey on Stellar Testnet and verify all transaction hashes on Stellar Expert Testnet explorer.
+| Layer | Choice |
+|---|---|
+| App | Next.js (App Router) + TypeScript, Tailwind |
+| DB / event log | SQLite for the demo (Postgres if deployed) |
+| Chain | `@stellar/stellar-sdk` + generated bindings, Soroban RPC `https://soroban-testnet.stellar.org` |
+| Payments | `@carts1024/velo-sdk` |
+| Agent | Any tool-calling LLM behind the decision schema, with a rules-engine fallback |
+| Map | Leaflet + OpenStreetMap tiles, or a static SVG if offline |
 
 ---
 
-## 16. Team Ownership & Delivery Operations
+## 15. Testing
 
-### 16.1 Team Ownership Matrix
-
-| Functional Area | Lead Assignee | Secondary Collaborator | Verification Sign-Off |
-|---|---|---|---|
-| **Product & System Architecture** | `@helenaherrero515` | Team Lead | `helenaherrero515` |
-| **Smart Contracts & Stellar Integration** | Full-Stack Lead | `@helenaherrero515` | Lead Engineer |
-| **Velo SDK & Webhook Integration** | Backend Lead | Full-Stack Lead | Backend Lead |
-| **Autonomous AI Agent & Telemetry** | Agent Lead | Backend Lead | Agent Lead |
-| **Frontend UI/UX & Live Pitch Demo** | `@helenaherrero515` | Design Lead | `helenaherrero515` |
-
-### 16.2 Canonical Hackathon Delivery Checklist
-- [x] **Repo Initialized:** GitHub repository configured with clean structure.
-- [ ] **SDK Installed:** `@carts1024/velo-sdk@0.1.0-alpha.4` installed and configured.
-- [ ] **Contracts Bound:** Three Noir contracts mapped to verified testnet addresses.
-- [ ] **Agent Running:** Autonomous telemetry loop ingesting simulated AIS marine feed.
-- [ ] **Checkout Live:** Velo Pay checkout URLs functional for corporate debtor.
-- [ ] **Demo Video & Pitch Deck:** 3-minute pitch video recorded showcasing the live end-to-end loop.
+1. **Unit:** factoring math with property tests (parts always sum to V, for random V); decision validator; webhook verify (valid, forged, stale, duplicate); berthing rule (inside/outside, dwell).
+2. **Contract integration on Testnet:** lifecycle script (FR-01); over-cap revert; nonce reuse fails; `claim` pays the expected pending amount.
+3. **End to end:** full demo loop three times in a row with recorded hashes (scope-freeze trigger).
+4. **Demo insurance:** pre-funded accounts, a recorded backup video, and a "simulate webhook" button in ops.
 
 ---
 
-## 17. Open Questions, Tradeoffs & Risk Register
+## 16. Spikes to run on Nov 5 (before building on assumptions)
 
-| Risk ID | Description | Impact | Probability | Mitigation Strategy | Owner |
-|---|---|:---:|:---:|---|---|
-| **R-01** | Stellar Testnet RPC transient latency or rate-limiting during live pitch. | High | Med | Implement exponential backoff retry in client; cache latest confirmed state in memory. | Backend Lead |
-| **R-02** | Velo Gas Station daily cap or wallet rate limit reached on Testnet. | Med | Low | Configure automatic fallback to self-funded operator keypair for transaction fees. | Backend Lead |
-| **R-03** | Webhook delivery delay over public internet during live demo. | Med | Low | Provide an instant "Manual Webhook Trigger / Re-poll" button in developer debug panel. | Frontend Lead |
-| **R-04** | Complex maritime logistics terminology confuses judges. | High | Med | Keep UI visual: emphasize the ₱850,000 cash advance for fuel and the interactive ship moving on the map. | `@helenaherrero515` |
+| ID | Question | Fallback |
+|---|---|---|
+| S1 | Exact signatures of `register`, `register_agent`, `revoke_agent`, `defund_escrow`, `sweep_on_revoke` in the deployed source / bindings | Adjust the chain service only; nothing else should change |
+| S2 | Can the LP (a wallet other than the device owner) fund the invoice device, and does `sweep_on_revoke` then return those funds to the **owner**? | Have the LP pay the treasury, which funds the escrow |
+| S3 | Does `device_registry.register` reject an already-registered hash? | Enforce uniqueness in the DB and describe on-chain uniqueness as a roadmap item |
+| S4 | Where do Velo checkout payments settle (address, asset)? Which assets does checkout support? | Treasury receives, then funds the escrow |
+| S5 | Is `payment_escrow` on Gas Station's allowed-contract list? What are the daily limits? | Relayer pays fees |
+| S6 | Velo webhook header names, the verify helper and the event types in alpha.4 | Verify HMAC manually per Velo docs |
+| S7 | Is `@noirx402/agent-sdk` compatible with the current contracts? Is it faster than generated bindings? | Generated bindings |
+
+Record the results in `docs/spikes.md`, then update §10 and change the status to Approved.
 
 ---
 
-## 18. Sign-Off & Approval
+## 17. Schedule (Manila time)
 
-*Approved for immediate sprint implementation for the Noir x Velo Hackathon:*
+| Day | Goal | Exit criterion |
+|---|---|---|
+| **Thu Nov 5** | Spikes S1 to S7, provisioning script, lifecycle script | A real `authorize` and `claim` land on Testnet |
+| **Fri Nov 6** | Tokenize → advance → checkout → webhook → settle, end to end (ugly UI is fine) | Full loop once with hashes by midnight |
+| **Sat Nov 7** | Over-cap demo, dashboard polish, map, deploy, backup video, README + diagram | Loop runs 3× clean → **code freeze Saturday night** |
+| **Sun Nov 8** | Final checks, **submit before 8:00 AM** | Submitted |
 
-- [x] **Product & Architecture Lead (`@helenaherrero515`):** Complete PRD specification approved.
-- [x] **Smart Contracts & Protocol Lead:** Noir Testnet contract architecture approved.
-- [x] **Velo Integration Lead:** Velo SDK, Checkout, and Gas Station architecture approved.
-- [x] **Hackathon Delivery Coordinator:** Scope frozen to P0 Winning Demo Loop.
+---
+
+## 18. Team
+
+| Area | Lead | Backup |
+|---|---|---|
+| Product, pitch, frontend | `@helenaherrero515` | — |
+| Chain service & provisioning | _TBD_ | — |
+| Velo checkout, webhooks, Gas Station | _TBD_ | — |
+| Agent, executor, simulator | _TBD_ | — |
+
+*(Fill in names. With 2 people, combine chain + Velo, and agent + frontend.)*
+
+---
+
+## 19. Risks
+
+| ID | Risk | Impact | Mitigation | Owner |
+|---|---|:-:|---|---|
+| R-01 | Contract interface differs from §10.1 | High | S1 on day 1; all calls behind one wrapper | Chain |
+| R-02 | Velo checkout can't feed the escrow directly | Med | Treasury hop (S4) | Velo |
+| R-03 | Gas Station refuses escrow calls | Med | Relayer account (S5) | Velo |
+| R-04 | Testnet / RPC slow during the pitch | High | Retries with backoff, cached state, backup video | Backend |
+| R-05 | Nonce collision from concurrent payouts | Med | Per-agent queue, one tx in flight | Agent |
+| R-06 | Judges lost in maritime and finance jargon | High | Lead with "₱850k for fuel the day they sail" and keep the ship moving on the map | Product |
+| R-07 | Regulatory questions in Q&A | Med | §9.3 talking points; present it as a Testnet prototype | Product |
+
+---
+
+## 20. Submission Checklist
+- [ ] Uses Velo SDK, `device_registry`, `agent_registry`, `payment_escrow` on the latest Testnet
+- [ ] Public repo with README, architecture diagram, setup steps, `.env.example`
+- [ ] `docs/spikes.md` with the S1 to S7 results
+- [ ] Explorer links: full happy path **and** the rejected over-cap payment
+- [ ] Live demo URL + backup video
+- [ ] Pitch deck (problem → solution → live demo → why Stellar/Noir/Velo → market → roadmap)
+- [ ] Submitted before **Sun Nov 8, 8:00 AM**
+
+---
+
+## 21. Sign-Off (after spikes)
+- [ ] Product & architecture (`@helenaherrero515`)
+- [ ] Chain service lead: §10.1 confirmed against the source
+- [ ] Velo lead: §10.5 confirmed against the SDK
+- [ ] Agent lead: decision schema and executor checks agreed
