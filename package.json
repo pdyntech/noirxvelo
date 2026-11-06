@@ -12,6 +12,7 @@
   "scripts": {
     "provision": "tsx scripts/provision.ts",
     "lifecycle": "tsx scripts/lifecycle.ts",
+    "default-demo": "tsx scripts/default-demo.ts",
     "test": "vitest run"
   },
   "devDependencies": {
