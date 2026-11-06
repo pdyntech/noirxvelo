@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sailo · Dashboard</title>
+  <meta name="description" content="85% of a freight invoice the day the ship sails. An AI settlement agent with on-chain spending limits (Noir) and Velo checkout." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b1220'/%3E%3Cpath d='M6 19h20l-3 6H9z' fill='%232dd4bf'/%3E%3Cpath d='M15 6v12M15 7l7 9h-7' stroke='%23f5b94a' stroke-width='2' fill='none'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 64 56"><path d="M27 2 L27 40 L6 40 Z" fill="#fff"/><path d="M31 9 L44 40 L31 40 Z" fill="#f47b00"/><path d="M2 45 C18 54 44 54 62 42 C48 48 26 49 2 45 Z" fill="#fff"/><path d="M14 49 C26 53 38 52 46 48 C36 50 24 50 14 49 Z" fill="#4cc9dc"/></svg>
+      </div>
+      <div>
+        <div class="brand-name"><a href="/" style="color:inherit">Sailo</a></div>
+        <div class="brand-sub">Agentic freight factoring · Noir × Velo · Stellar Testnet</div>
+      </div>
+    </div>
+    <nav class="roles" id="roles" role="tablist" aria-label="Role">
+      <button data-role="shipowner" role="tab">Shipowner</button>
+      <button data-role="investor" role="tab">Investor</button>
+      <button data-role="debtor" role="tab">Debtor</button>
+      <button data-role="ops" role="tab">Ops</button>
+    </nav>
+    <div class="chips" id="chips"></div>
+  </header>
+
+  <div id="banner"></div>
+
+  <section class="pipeline" id="pipeline" aria-label="Invoice status"></section>
+
+  <main class="grid">
+    <section class="col-left" id="role-panel" aria-live="polite"></section>
+
+    <section class="col-mid">
+      <div class="card" id="voyage-card"></div>
+      <div class="card" id="kpis"></div>
+    </section>
+
+    <section class="col-right card" id="decisions-card">
+      <div class="card-head">
+        <h2>Agent decision stream</h2>
+        <span class="muted small">newest first</span>
+      </div>
+      <div id="decisions" class="decisions"></div>
+    </section>
+  </main>
+
+  <section class="card ledger-card">
+    <div class="card-head">
+      <h2>On-chain ledger</h2>
+      <span class="muted small">every transaction links to Stellar Expert (Testnet)</span>
+    </div>
+    <div id="ledger"></div>
+  </section>
+
+  <footer class="site-foot muted small">
+    Testnet prototype. Demo rate 1 XLM = ₱1,000. Fictional shipper, vessel and debtor. Contracts: Noir week4 deployment via <code>@noirx402/agent-sdk</code>; payments UX via <code>@carts1024/velo-sdk</code>.
+  </footer>
+
+  <aside class="ops" id="ops">
+    <button class="ops-toggle" id="ops-toggle" aria-expanded="true">Ops debug panel <span id="ops-busy"></span></button>
+    <div class="ops-body" id="ops-body">
+      <div class="ops-actions" id="ops-actions"></div>
+      <div class="ops-log" id="ops-log" aria-live="polite"></div>
+    </div>
+  </aside>
+
+  <dialog id="modal">
+    <form method="dialog" class="modal-head">
+      <h3 id="modal-title">Details</h3>
+      <button class="btn ghost" aria-label="Close">✕</button>
+    </form>
+    <div id="modal-body"></div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
