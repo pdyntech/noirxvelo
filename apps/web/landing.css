@@ -23,6 +23,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .hero {
   position: relative;
   min-height: 100vh;
+  min-height: 100svh;
   display: flex;
   flex-direction: column;
   /* Gradient fallback; the photo layer is .hero::before (apps/web/assets/hero-port.jpg). */
@@ -54,7 +55,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .nav { width: min(1406px, calc(100% - 48px)); margin: 30px auto 0; display: flex; align-items: center; justify-content: flex-end; position: relative; min-height: 55px; }
 .nav-links { position: absolute; left: 50%; transform: translateX(-50%); display: flex; gap: 48px; }
 .nav-links a { font-size: 20px; font-weight: 500; color: var(--ink); opacity: .96; white-space: nowrap; }
-.nav-links a:hover { color: #ffd2a3; }
+.nav-links a:hover { color: #ffd2a3; text-decoration: underline; text-underline-offset: 6px; }
 
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 14px; font-weight: 700; border-radius: 12px; transition: background .2s, transform .08s, border-color .2s; white-space: nowrap; }
 .btn:active { transform: translateY(1px); }
@@ -151,4 +152,12 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   .flow-item { border-left: 0 !important; border-top: 1px solid var(--line); }
   .flow-item:first-child { border-top: 0; }
 }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+a:focus-visible, .btn:focus-visible { outline: 3px solid #ffd2a3; outline-offset: 4px; border-radius: 12px; }
+.skip { position: absolute; left: 16px; top: -60px; z-index: 100; background: var(--orange); color: #1e1307; padding: 12px 18px; border-radius: 10px; font-weight: 700; }
+.skip:focus { top: 12px; }
+.section[id] { scroll-margin-top: 24px; }
+@media (max-width: 760px) {
+  .nav-links a { padding: 10px 2px; }
+  .nav-links a:nth-child(n + 3) { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { transition-duration: .001ms !important; } }

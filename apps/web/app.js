@@ -133,7 +133,7 @@ function renderPipeline() {
   const html = STEPS.map((s, i) => {
     const sr = i + 1;
     const cls = sr <= r ? "done" : sr === r + 1 && st !== "SETTLED" && st !== "DEFAULT" ? "current" : "";
-    return `<div class="step ${cls}"><div class="node"><div class="circle">${sr <= r ? "✓" : sr}</div><div class="label">${s.replace("_", " ")}</div></div><div class="bar"></div></div>`;
+    return `<div class="step ${cls}"${cls === "current" ? ' aria-current="step"' : ""}><div class="node"><div class="circle" aria-hidden="true">${sr <= r ? "✓" : sr}</div><div class="label">${s.replace("_", " ")}<span class="sr-only">${cls === "done" ? " (done)" : cls === "current" ? " (next)" : ""}</span></div></div><div class="bar" aria-hidden="true"></div></div>`;
   }).join("");
   const term = st === "HOLD" ? '<span class="terminal hold">HOLD</span>' : st === "DEFAULT" ? '<span class="terminal default">DEFAULT · recovered</span>' : "";
   $("#pipeline").innerHTML = html + term;
@@ -254,7 +254,11 @@ function opsPanel() {
 function renderRolePanel() {
   const map = { shipowner: [shipownerPanel], investor: [investorPanel], debtor: [debtorPanel], ops: [opsPanel, shipownerPanel, investorPanel, debtorPanel] };
   $("#role-panel").innerHTML = map[role].map((f) => f()).join("");
-  document.querySelectorAll("#roles button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.role === role)));
+  document.querySelectorAll("#roles button").forEach((b) => {
+    const on = b.dataset.role === role;
+    b.setAttribute("aria-selected", String(on));
+    b.tabIndex = on ? 0 : -1;
+  });
 }
 
 // ----- voyage chart -----
@@ -377,7 +381,7 @@ function renderDecisions() {
       const pills = d.payouts.map((p) => `<span class="pill ${esc(p.role)} ${d.decision === "REFUSED" ? "strike" : ""}">${esc(p.role)}: ${esc(p.xlm)} XLM</span>`).join("");
       const txs = d.txs.map((t) => `<div><span class="muted">${esc(t.step)} ${esc(t.role)}</span> · ${txLink(t)}</div>`).join("");
       const refusal = d.refusal ? `<div class="small" style="margin-top:6px;color:${d.decision === "REFUSED" ? "#c4b5fd" : "var(--amber)"}">refusal: <b>${esc(d.refusal)}</b>${d.detail ? ` · ${esc(d.detail)}` : ""}</div>` : "";
-      return `<article class="dec" data-dec="${esc(d.id)}" tabindex="0">
+      return `<article class="dec" data-dec="${esc(d.id)}" tabindex="0" aria-haspopup="dialog">
         <div class="dec-head"><span class="badge b-${esc(d.decision)}">${esc(d.decision)}</span>${d.requested !== d.decision ? `<span class="engine">requested ${esc(d.requested)}</span>` : ""}<span class="engine">${esc(d.engine)}</span><span class="dec-time">${esc(time(d.at))}</span></div>
         <div class="dec-reason">${esc(d.reason)}</div>
         ${pills ? `<div class="pills">${pills}</div>` : ""}
@@ -416,8 +420,27 @@ function renderOps() {
   if (atBottom) box.scrollTop = box.scrollHeight;
 }
 
+// Re-rendering replaces whole panels; keep keyboard focus and scroll positions across live updates.
+function focusKey(el) {
+  if (!(el instanceof Element)) return null;
+  const a = el.closest("[data-act]");
+  if (a) return `[data-act="${CSS.escape(a.dataset.act)}"]`;
+  const d = el.closest("[data-dec]");
+  if (d) return `[data-dec="${CSS.escape(d.dataset.dec)}"]`;
+  return null;
+}
 function render() {
   if (!S) return;
+  const key = focusKey(document.activeElement);
+  const scrollers = ["#decisions", "#ops-log", "#ops-actions"].map((q) => [q, $(q)?.scrollTop || 0]);
+  renderAll();
+  for (const [q, top] of scrollers) { const el = $(q); if (el) el.scrollTop = top; }
+  if (key) {
+    const el = document.querySelector(key);
+    if (el && el !== document.activeElement) el.focus({ preventScroll: true });
+  }
+}
+function renderAll() {
   renderChips();
   renderBanner();
   renderPipeline();
@@ -470,6 +493,16 @@ document.addEventListener("click", (e) => {
   if (el.closest('[data-open="attestation"]') && S?.attestation) return openModal("Proof of delivery", attestationHtml(S.attestation));
 });
 document.addEventListener("keydown", (e) => {
+  const tab = e.target instanceof Element ? e.target.closest("#roles button") : null;
+  if (tab && ["ArrowRight", "ArrowLeft", "Home", "End"].includes(e.key)) {
+    const tabs = [...document.querySelectorAll("#roles button")];
+    const i = tabs.indexOf(tab);
+    const next = e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : (i + (e.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+    e.preventDefault();
+    tabs[next].focus();
+    tabs[next].click();
+    return;
+  }
   const d = e.target instanceof Element ? e.target.closest("[data-dec]") : null;
   if (d && (e.key === "Enter" || e.key === " ")) {
     e.preventDefault();
