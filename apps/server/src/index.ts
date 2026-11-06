@@ -109,6 +109,7 @@ async function serveStatic(path: string, res: ServerResponse): Promise<void> {
     res.writeHead(200, { "content-type": MIME[extname(target)] ?? "application/octet-stream", "cache-control": "no-cache" });
     res.end(body);
   } catch {
+    if (extname(rel)) return send(res, 404, { error: "not found" }); // missing asset, e.g. optional hero photo
     const body = await readFile(join(WEB_DIR, "index.html"));
     res.writeHead(200, { "content-type": MIME[".html"]! });
     res.end(body);

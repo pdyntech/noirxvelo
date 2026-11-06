@@ -1,4 +1,4 @@
-// Bunkr VisMin frontend. No build step: plain ES modules, live state over Server-Sent Events.
+// Sailo dashboard. No build step: plain ES modules, live state over Server-Sent Events.
 // Covers UI-01 role switcher, UI-02 portals, UI-03 voyage, UI-04 decision stream, OPS-01 debug panel.
 
 const $ = (sel) => document.querySelector(sel);

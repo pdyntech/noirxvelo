@@ -3,81 +3,123 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Bunkr VisMin · Agentic freight factoring on Stellar</title>
-  <meta name="description" content="85% of a freight invoice the day the ship sails. An AI settlement agent with on-chain spending limits (Noir) and Velo checkout." />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b1220'/%3E%3Cpath d='M6 19h20l-3 6H9z' fill='%232dd4bf'/%3E%3Cpath d='M15 6v12M15 7l7 9h-7' stroke='%23f5b94a' stroke-width='2' fill='none'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/styles.css" />
+  <title>Sailo · Freight advances for island shipping lines</title>
+  <meta name="description" content="Sailo advances 85% of a freight invoice the day the ship sails. An AI settlement agent pays within on-chain limits it cannot exceed. Built on Stellar with Noir and Velo." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 56'%3E%3Cpath d='M27 2 L27 40 L6 40 Z' fill='%23fff'/%3E%3Cpath d='M31 9 L44 40 L31 40 Z' fill='%23f47b00'/%3E%3Cpath d='M2 45 C18 54 44 54 62 42 C48 48 26 49 2 45 Z' fill='%23fff'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+  <link rel="stylesheet" href="/landing.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="logo" aria-hidden="true">
-        <svg viewBox="0 0 32 32"><path d="M6 19h20l-3 6H9z" fill="#2dd4bf"/><path d="M15 6v12M15 7l7 9h-7" stroke="#f5b94a" stroke-width="2" fill="none"/></svg>
+  <header class="hero" id="top">
+    <nav class="nav" aria-label="Main">
+      <div class="nav-links">
+        <a href="#about">About</a>
+        <a href="#how">How it works</a>
+        <a href="#numbers">Numbers</a>
+        <a href="#guardrails">Guardrails</a>
       </div>
-      <div>
-        <div class="brand-name">Bunkr VisMin</div>
-        <div class="brand-sub">Agentic freight factoring · Noir × Velo · Stellar Testnet</div>
-      </div>
-    </div>
-    <nav class="roles" id="roles" role="tablist" aria-label="Role">
-      <button data-role="shipowner" role="tab">Shipowner</button>
-      <button data-role="investor" role="tab">Investor</button>
-      <button data-role="debtor" role="tab">Debtor</button>
-      <button data-role="ops" role="tab">Ops</button>
+      <a class="btn btn-orange nav-cta" href="/app">Get started</a>
     </nav>
-    <div class="chips" id="chips"></div>
+
+    <div class="wrap hero-body">
+      <h1 class="lockup" aria-label="Sailo">
+        <svg class="mark" viewBox="0 0 250 200" aria-hidden="true">
+          <path d="M101 0 L101 135 L10 135 Z" fill="#fff" />
+          <path d="M117 22 L168 128 L117 128 Z" fill="#f47b00" />
+          <path d="M0 160 C58 205 168 210 248 140 C196 172 116 184 0 160 Z" fill="#fff" />
+          <path d="M68 178 C110 194 152 192 182 178 C150 186 110 186 68 178 Z" fill="#4cc9dc" />
+        </svg>
+        <span class="word">Sailo</span>
+      </h1>
+
+      <p class="tagline">Freight advances for island shipping lines, guarded by an AI that can’t overspend.</p>
+
+      <div class="cta-row">
+        <a class="btn btn-orange btn-lg" href="/app">Get started <span aria-hidden="true">→</span></a>
+        <a class="btn btn-ghost btn-lg" href="#how">How it works</a>
+      </div>
+
+      <dl class="stats">
+        <div class="stat stat-hl"><dt>₱850,000</dt><dd>advanced on a ₱1,000,000 invoice</dd></div>
+        <div class="stat"><dt>85%</dt><dd>advanced at departure</dd></div>
+        <div class="stat"><dt>0 XLM</dt><dd>fees for shippers</dd></div>
+        <div class="stat"><dt>3.53%</dt><dd>investor return over 60 days*</dd></div>
+      </dl>
+      <p class="footnote">*Illustrative return on an 85% advance. Returns are not guaranteed.</p>
+    </div>
   </header>
 
-  <div id="banner"></div>
-
-  <section class="pipeline" id="pipeline" aria-label="Invoice status"></section>
-
-  <main class="grid">
-    <section class="col-left" id="role-panel" aria-live="polite"></section>
-
-    <section class="col-mid">
-      <div class="card" id="voyage-card"></div>
-      <div class="card" id="kpis"></div>
+  <main>
+    <section class="section" id="about">
+      <div class="wrap two-col">
+        <div>
+          <p class="eyebrow">About</p>
+          <h2>Ships sail on cash. Freight gets paid in 60 days.</h2>
+        </div>
+        <div class="prose">
+          <p>Inter-island shipping lines pay for bunker fuel, port dues and crew before they leave port. The cargo owners they carry for pay on Net-60 to Net-90 terms. Small operators fill that gap with slow bank lines or expensive informal loans.</p>
+          <p>Sailo turns a freight invoice into an on-chain escrow. An investor funds 85% of it, and the shipowner has the money the day the vessel sails. When the cargo owner pays through a normal Velo checkout, an AI settlement agent repays the investor and returns the reserve.</p>
+        </div>
+      </div>
     </section>
 
-    <section class="col-right card" id="decisions-card">
-      <div class="card-head">
-        <h2>Agent decision stream</h2>
-        <span class="muted small">newest first</span>
+    <section class="section alt" id="how">
+      <div class="wrap">
+        <p class="eyebrow">How it works</p>
+        <h2>Four steps, one agent, every payment on Stellar.</h2>
+        <ol class="steps">
+          <li><span class="n">1</span><h3>Tokenize the waybill</h3><p>The invoice hash is registered on Noir’s <code>device_registry</code>, and the agent gets a spending policy in <code>agent_registry</code>: per-payment cap, asset and expiry.</p></li>
+          <li><span class="n">2</span><h3>Advance at departure</h3><p>An investor funds the escrow. When AIS shows the vessel underway, the agent releases the 85% advance to the shipowner.</p></li>
+          <li><span class="n">3</span><h3>Prove delivery</h3><p>Inside the Cebu port geofence at ≤0.5 knots for three readings, the agent signs a proof-of-delivery attestation.</p></li>
+          <li><span class="n">4</span><h3>Settle on payment</h3><p>The cargo owner pays via Velo checkout. After a verified webhook, the agent repays the investor, rebates the shipowner and takes the fee.</p></li>
+        </ol>
       </div>
-      <div id="decisions" class="decisions"></div>
+    </section>
+
+    <section class="section" id="numbers">
+      <div class="wrap">
+        <p class="eyebrow">Numbers</p>
+        <h2>A ₱1,000,000 invoice, settled to the last stroop.</h2>
+        <div class="flow">
+          <div class="flow-item"><span class="k">Advance to shipowner</span><span class="v">₱850,000</span><span class="s">85%, the day the ship sails</span></div>
+          <div class="flow-item"><span class="k">Investor repayment</span><span class="v">₱880,000</span><span class="s">principal + 3% of face</span></div>
+          <div class="flow-item"><span class="k">Reserve rebate</span><span class="v">₱115,000</span><span class="s">back to the shipowner</span></div>
+          <div class="flow-item"><span class="k">Protocol fee</span><span class="v">₱5,000</span><span class="s">0.5% of face</span></div>
+        </div>
+        <p class="note">Integer accounting: repayment + rebate + fee always equals the invoice. Testnet demo amounts at a fixed rate of 1 XLM = ₱1,000.</p>
+      </div>
+    </section>
+
+    <section class="section alt" id="guardrails">
+      <div class="wrap two-col">
+        <div>
+          <p class="eyebrow">Guardrails</p>
+          <h2>The agent decides. The chain sets the limits.</h2>
+        </div>
+        <ul class="checks">
+          <li><b>Capped on-chain.</b> Every payment is checked by Noir’s <code>agent_registry</code>. A single payout above the cap is refused before any fee is paid.</li>
+          <li><b>Roles, not addresses.</b> The agent names who gets paid (shipowner, investor, treasury). Code maps roles to stored wallets and recomputes every amount.</li>
+          <li><b>Two gates to settle.</b> A verified Velo webhook for the exact invoice amount, plus a signed berthing attestation.</li>
+          <li><b>Fail closed.</b> Any mismatch becomes a HOLD. On default, ops revokes the agent and sweeps the escrow back to treasury.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section cta-band">
+      <div class="wrap cta-inner">
+        <h2>See a full voyage settle on Testnet.</h2>
+        <a class="btn btn-orange btn-lg" href="/app">Open the live demo <span aria-hidden="true">→</span></a>
+      </div>
     </section>
   </main>
 
-  <section class="card ledger-card">
-    <div class="card-head">
-      <h2>On-chain ledger</h2>
-      <span class="muted small">every transaction links to Stellar Expert (Testnet)</span>
+  <footer class="foot">
+    <div class="wrap foot-inner">
+      <span>Sailo · Testnet prototype for the Velo × Noir Agentic Payment Hackathon</span>
+      <span>Fictional shipper, vessel and debtor. Not financial advice.</span>
     </div>
-    <div id="ledger"></div>
-  </section>
-
-  <footer class="site-foot muted small">
-    Testnet prototype. Demo rate 1 XLM = ₱1,000. Fictional shipper, vessel and debtor. Contracts: Noir week4 deployment via <code>@noirx402/agent-sdk</code>; payments UX via <code>@carts1024/velo-sdk</code>.
   </footer>
-
-  <aside class="ops" id="ops">
-    <button class="ops-toggle" id="ops-toggle" aria-expanded="true">Ops debug panel <span id="ops-busy"></span></button>
-    <div class="ops-body" id="ops-body">
-      <div class="ops-actions" id="ops-actions"></div>
-      <div class="ops-log" id="ops-log" aria-live="polite"></div>
-    </div>
-  </aside>
-
-  <dialog id="modal">
-    <form method="dialog" class="modal-head">
-      <h3 id="modal-title">Details</h3>
-      <button class="btn ghost" aria-label="Close">✕</button>
-    </form>
-    <div id="modal-body"></div>
-  </dialog>
-
-  <div id="toast" class="toast" role="status"></div>
-  <script src="/app.js" type="module"></script>
 </body>
 </html>
