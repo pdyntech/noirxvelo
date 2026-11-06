@@ -8,6 +8,7 @@
 import { computePayouts, settlementTotal } from "@noirxvelo/shared";
 import type { NoirAgentClient, NoirSigner } from "./client.js";
 import { normalizeError } from "./errors.js";
+import type { DefaultRecoveryResult } from "./recovery.js";
 
 export type Role = "SHIPOWNER" | "LP" | "TREASURY";
 export type DecisionKind = "ADVANCE" | "SETTLE" | "HOLD" | "DEFAULT";
@@ -75,6 +76,8 @@ export interface ExecutorGates {
   webhookAmount?: bigint;
   /** Berthing attestation present. */
   berthingAttestation: boolean;
+  /** Injected fact: invoice due date + grace period has passed. Required for DEFAULT. */
+  dueDatePlusGracePassed?: boolean;
 }
 
 export interface ExecutorSigners {
@@ -95,6 +98,11 @@ export interface ExecutorContext {
   addresses: Record<Role, string>;
   signers: ExecutorSigners;
   gates: ExecutorGates;
+  /**
+   * Optional ops hook that runs defaultRecovery for this invoice. `execute` NEVER calls it:
+   * only the explicit `runDefaultRecovery` does.
+   */
+  recovery?: () => Promise<DefaultRecoveryResult>;
 }
 
 export interface StepLog {
@@ -196,6 +204,12 @@ export async function execute(input: unknown, ctx: ExecutorContext): Promise<Exe
     return holdResult({ invoiceId: id, decision: "HOLD" }, { step: "precondition", reason: "invalid_decision", detail: v.errors.join("; ") });
   }
   const d = v.decision;
+
+  // DEFAULT: never sends payouts. Needs due date + grace passed and no verified payment, else HOLD.
+  if (d.decision === "DEFAULT") {
+    const failure = defaultPrecondition(d.invoiceId, ctx);
+    if (failure) return holdResult(d, failure, { finalEscrowBalance: await readBalance(ctx) });
+  }
 
   // HOLD / DEFAULT: nothing is ever sent.
   if (d.decision === "HOLD" || d.decision === "DEFAULT") {
@@ -331,4 +345,23 @@ async function readBalance(ctx: ExecutorContext): Promise<bigint | null> {
   } catch {
     return null;
   }
+}
+
+function defaultPrecondition(invoiceId: string, ctx: ExecutorContext): ExecutionFailure | null {
+  const f = (reason: string): ExecutionFailure => ({ step: "precondition", reason });
+  if (invoiceId !== ctx.invoice.id) return f("invoice_mismatch");
+  if (ctx.gates.dueDatePlusGracePassed !== true) return f("default_not_due");
+  if (ctx.gates.webhookVerified) return f("payment_verified");
+  if (ctx.invoice.state === "PAID" || ctx.invoice.state === "SETTLED") return f("payment_verified");
+  return null;
+}
+
+/**
+ * Explicit ops trigger for the recovery sequence (revoke agent + sweep escrow to Treasury).
+ * Only runs for an executed DEFAULT result and when ctx.recovery is provided; never automatic.
+ */
+export async function runDefaultRecovery(result: ExecutionResult, ctx: ExecutorContext): Promise<DefaultRecoveryResult> {
+  if (result.decision !== "DEFAULT" || !result.ok) throw new Error(`recovery requires an executed DEFAULT decision (got ${result.decision}, ok=${result.ok})`);
+  if (!ctx.recovery) throw new Error("no recovery hook configured in ExecutorContext");
+  return ctx.recovery();
 }
