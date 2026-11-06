@@ -59,6 +59,8 @@ const ACTIONS: Record<string, () => Promise<unknown>> = {
   "/api/guardrail": demo.guardrail,
   "/api/default": demo.simulateDefault,
   "/api/reset": demo.reset,
+  "/api/mode/simulation": demo.useSimulation,
+  "/api/mode/testnet": demo.useTestnet,
   "/api/run-demo": demo.runDemo,
 };
 

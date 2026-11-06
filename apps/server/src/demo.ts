@@ -26,6 +26,7 @@ import {
 } from "@noirxvelo/agent";
 import { SEED_WAYBILL, canonicalJson, computePayouts, fromStroops, invoiceHash, toStroops } from "@noirxvelo/shared";
 import { decide, type Facts } from "./agent.js";
+import { createSimChain, type SimChain } from "./simchain.js";
 import { env, missingChainEnv } from "./env.js";
 import { CEBU, TOTAL_TICKS, berthTicksFrom, isBerthed, isUnderway, makeTick, type Tick } from "./telemetry.js";
 import {
@@ -111,7 +112,7 @@ export interface DemoState {
   busy: string | null;
   autopilot: boolean;
   error: string | null;
-  config: { chainReady: boolean; missing: string[]; veloCheckout: boolean; realWebhookSecret: boolean; llm: boolean; tickMs: number };
+  config: { chainReady: boolean; mode: "testnet" | "simulation"; canGoLive: boolean; missing: string[]; veloCheckout: boolean; realWebhookSecret: boolean; llm: boolean; tickMs: number };
   updatedAt: string;
 }
 
@@ -124,8 +125,17 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- wallets ----------
 const pub = (r: Wallet) => env(`${r}_PUBLIC`) ?? null;
+// ---------- chain mode ----------
+// Simulation is used when Testnet wallets are missing, when SIMULATE_CHAIN=1, or after the operator
+// switches to it (e.g. Testnet RPC down). The UI labels every simulated transaction.
+let simMode = env("SIMULATE_CHAIN") === "1" || missingChainEnv().length > 0;
+let sim: SimChain | null = null;
+const getSim = () => (sim ??= createSimChain());
+const linkFor = (url: string) => (simMode ? "" : url);
+
 let signers: Record<"AGENT" | Role, NoirSigner> | null = null;
 function getSigners(): Record<"AGENT" | Role, NoirSigner> {
+  if (simMode) return getSim().signers;
   if (signers) return signers;
   const miss = missingChainEnv();
   if (miss.length) throw new Error(`Missing wallet env: ${miss.join(", ")}. Run npm run provision.`);
@@ -139,7 +149,7 @@ function getSigners(): Record<"AGENT" | Role, NoirSigner> {
 }
 
 let client: NoirAgentClient | null = null;
-const getClient = () => (client ??= new NoirAgentClient());
+const getClient = (): NoirAgentClient => (simMode ? getSim().client : (client ??= new NoirAgentClient()));
 
 // ---------- state ----------
 let runCounter = 0;
@@ -176,7 +186,9 @@ function freshState(): DemoState {
     },
     escrowXlm: null,
     balances: { TREASURY: null, SHIPOWNER: null, LP: null, AGENT: null, DEBTOR: null },
-    addresses: { TREASURY: pub("TREASURY"), SHIPOWNER: pub("SHIPOWNER"), LP: pub("LP"), AGENT: pub("AGENT"), DEBTOR: pub("DEBTOR") },
+    addresses: simMode
+      ? { TREASURY: getSim().signers.TREASURY.publicKey, SHIPOWNER: getSim().signers.SHIPOWNER.publicKey, LP: getSim().signers.LP.publicKey, AGENT: getSim().signers.AGENT.publicKey, DEBTOR: getSim().signers.DEBTOR.publicKey }
+      : { TREASURY: pub("TREASURY"), SHIPOWNER: pub("SHIPOWNER"), LP: pub("LP"), AGENT: pub("AGENT"), DEBTOR: pub("DEBTOR") },
     voyage: { running: false, ticks: [], latest: null, berthed: false, totalTicks: TOTAL_TICKS },
     attestation: null,
     checkout: null,
@@ -190,7 +202,9 @@ function freshState(): DemoState {
     autopilot: false,
     error: null,
     config: {
-      chainReady: miss.length === 0,
+      chainReady: simMode || miss.length === 0,
+      mode: simMode ? "simulation" : "testnet",
+      canGoLive: miss.length === 0,
       missing: miss,
       veloCheckout: veloCheckoutConfigured(),
       realWebhookSecret: usingRealWebhookSecret(),
@@ -228,7 +242,7 @@ function setStatus(s: Status): void {
   }
 }
 function addTx(label: string, role: string, t: { hash: string; explorerUrl: string }): void {
-  state.txs.push({ label, role, hash: t.hash, url: t.explorerUrl, at: now() });
+  state.txs.push({ label, role, hash: t.hash, url: linkFor(t.explorerUrl), at: now() });
   log("ok", `${label}: ${t.hash.slice(0, 10)}…`);
 }
 
@@ -247,7 +261,7 @@ async function refreshBalances(): Promise<void> {
       const a = state.addresses[w];
       if (!a) return;
       try {
-        state.balances[w] = xlm(await horizonXlmBalance(a));
+        state.balances[w] = xlm(simMode ? getSim().ledger.balance(a) : await horizonXlmBalance(a));
       } catch {
         /* keep the last value */
       }
@@ -381,7 +395,7 @@ function recordDecision(proposal: AgentDecision | null, engine: string, r: Execu
     detail: r?.failure?.detail ?? null,
     proposal,
     payouts: (proposal?.payouts ?? []).map((p) => ({ role: p.role, xlm: xlm(BigInt(p.amountStroops)) })),
-    txs: (r?.steps ?? []).map((st) => ({ step: st.step, role: st.role, xlm: xlm(st.amount), hash: st.hash, url: st.explorerUrl })),
+    txs: (r?.steps ?? []).map((st) => ({ step: st.step, role: st.role, xlm: xlm(st.amount), hash: st.hash, url: linkFor(st.explorerUrl) })),
     finalEscrowXlm: r?.finalEscrowBalance == null ? null : xlm(r.finalEscrowBalance),
     attestation: null,
     extra: null,
@@ -613,6 +627,8 @@ function progressPayment(): Promise<void> {
         await agentStep(); // HOLD with reason
         return;
       }
+      if (simMode) getSim().ledger.wallets.set(s.TREASURY.publicKey, getSim().ledger.balance(s.TREASURY.publicKey) + V); // simulated Velo payout from the debtor
+      if (simMode) getSim().ledger.wallets.set(state.addresses.DEBTOR!, getSim().ledger.balance(state.addresses.DEBTOR!) - V);
       addTx(`payment_escrow.fund_escrow (Treasury ${xlm(V)} XLM from Velo checkout)`, "TREASURY", await serial(() => getClient().fundEscrow(s.TREASURY, state.invoice.hash!, V)));
       if (state.run !== run) return;
       setStatus("PAID");
@@ -697,6 +713,26 @@ export function simulateDefault() {
   });
 }
 
+// ---------- chain mode switch ----------
+export function setMode(mode: "testnet" | "simulation") {
+  return action(mode === "simulation" ? "Switch to simulation" : "Switch to Testnet", async () => {
+    if (mode === "testnet" && missingChainEnv().length) throw new StepError(`Testnet wallets not configured (${missingChainEnv().join(", ")}).`);
+    voyageToken++;
+    fastForward = false;
+    await chainQueue.catch(() => undefined);
+    simMode = mode === "simulation";
+    sim = null; // fresh simulated ledger each time
+    const prevLog = state.log.slice(-3);
+    state = freshState();
+    state.busy = "Switching mode";
+    state.log.unshift(...prevLog.map((l) => ({ ...l, text: `(previous run) ${l.text}` })));
+    log(simMode ? "warn" : "ok", simMode ? "Simulation mode: contracts run in memory with the same rules (cap, escrow, revoke). Transactions are labelled simulated." : "Testnet mode: every action is a real Stellar Testnet transaction.");
+    await refreshBalances();
+  });
+}
+export const useSimulation = () => setMode("simulation");
+export const useTestnet = () => setMode("testnet");
+
 // ---------- reset / run demo ----------
 export function reset() {
   return action("Reset", async () => {
@@ -727,7 +763,7 @@ export function runDemo() {
         state.log.unshift(...keep);
         emit();
       }
-      log("info", "▶ Run Demo: full loop on Stellar Testnet.");
+      log("info", simMode ? "▶ Run Demo: full loop in SIMULATION mode (in-memory contracts, no Testnet transactions)." : "▶ Run Demo: full loop on Stellar Testnet.");
       await inner(tokenize);
       await sleep(800);
       await inner(fund);
@@ -758,7 +794,9 @@ async function inner(step: () => Promise<unknown>): Promise<void> {
 }
 
 export async function init(): Promise<void> {
-  if (state.config.chainReady) {
+  if (simMode) {
+    log("warn", state.config.missing.length ? `Testnet wallets missing (${state.config.missing.join(", ")}): running in SIMULATION mode.` : "SIMULATE_CHAIN=1: running in SIMULATION mode.");
+  } else if (state.config.chainReady) {
     try {
       getSigners();
     } catch (e) {
