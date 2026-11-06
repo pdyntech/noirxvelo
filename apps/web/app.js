@@ -8,7 +8,11 @@ const fmtXlm = (x) => (x == null ? "—" : `${Number(x).toLocaleString("en-US", 
 const fmtPhp = (x) => (x == null ? "—" : `₱${Math.round(Number(x) * 1000).toLocaleString("en-US")}`);
 const short = (h, n = 6) => (h ? `${h.slice(0, n)}…${h.slice(-4)}` : "");
 const time = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "");
-const txLink = (t) => `<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(short(t.hash, 8))} ↗</a>`;
+const copyBtn = (v, what = "transaction hash") => `<button type="button" class="copy" data-copy="${esc(v)}" aria-label="Copy ${esc(what)}" title="Copy ${esc(what)}"><span aria-hidden="true">⧉</span></button>`;
+const txLink = (t) =>
+  t.url
+    ? `<span class="tx"><a href="${esc(t.url)}" target="_blank" rel="noopener" title="Open on Stellar Expert (Testnet)">${esc(short(t.hash, 8))} ↗</a>${copyBtn(t.hash)}</span>`
+    : `<span class="tx"><span class="mono">${esc(short(t.hash, 8))}</span><span class="sim-tag" title="In-memory simulation: no Testnet transaction">simulated</span>${copyBtn(t.hash)}</span>`;
 
 const STEPS = ["TOKENIZED", "FUNDED", "ADVANCED", "IN_TRANSIT", "BERTHED", "PAID", "SETTLED"];
 const ORDER = ["DRAFT", ...STEPS];
@@ -74,6 +78,14 @@ function connect() {
 // ---------------- helpers ----------------
 const busy = () => !!S?.busy;
 const chainReady = () => !!S?.config?.chainReady;
+const isSim = () => S?.config?.mode === "simulation";
+
+// Balances at the start of each run, so wallets can show what this run moved.
+const baseline = {};
+function noteBaseline() {
+  if (!S || baseline[S.run] || S.status !== "DRAFT") return;
+  if (Object.values(S.balances || {}).some((v) => v != null)) baseline[S.run] = { ...S.balances };
+}
 
 const BUSY_NAMES = {
   tokenize: "Tokenize & register",
@@ -85,6 +97,9 @@ const BUSY_NAMES = {
   default: "Simulate default",
   reset: "Reset",
   "run-demo": "Run Demo",
+  "fast-forward": "Fast-forward",
+  "mode/simulation": "Switch to simulation",
+  "mode/testnet": "Switch to Testnet",
 };
 
 function button(path, label, { cls = "", enabled = true, title = "" } = {}) {
@@ -100,7 +115,15 @@ function field(label, value, full = false) {
 function wallet(name, key) {
   const addr = S.addresses?.[key];
   const bal = S.balances?.[key];
-  return `<div class="wallet"><span>${esc(name)} wallet ${addr ? `<a href="https://stellar.expert/explorer/testnet/account/${esc(addr)}" target="_blank" rel="noopener" class="mono">${esc(short(addr, 5))}</a>` : '<span class="muted">not configured</span>'}</span><b>${fmtXlm(bal)}</b></div>`;
+  const base = baseline[S.run]?.[key];
+  const delta = bal != null && base != null ? Number(bal) - Number(base) : 0;
+  const d = Math.abs(delta) >= 0.01 ? `<span class="delta ${delta > 0 ? "up" : "down"}" title="Change during this run">${delta > 0 ? "+" : "−"}${fmtXlm(Math.abs(delta))}</span>` : "";
+  const who = !addr
+    ? '<span class="muted">not configured</span>'
+    : isSim()
+      ? `<span class="mono" title="Simulated wallet (local keypair, never on a network)">${esc(short(addr, 5))}</span>`
+      : `<a href="https://stellar.expert/explorer/testnet/account/${esc(addr)}" target="_blank" rel="noopener" class="mono">${esc(short(addr, 5))}</a>`;
+  return `<div class="wallet"><span>${esc(name)} wallet ${who}</span><span class="wallet-bal">${d}<b class="tnum">${fmtXlm(bal)}</b></span></div>`;
 }
 
 const txWhere = (re) => (S?.txs || []).filter((t) => re.test(t.label));
@@ -110,20 +133,94 @@ function renderChips() {
   const c = S.config;
   const chip = (cls, text, title = "") => `<span class="chip ${cls}" title="${esc(title)}"><span class="dot"></span>${esc(text)}</span>`;
   $("#chips").innerHTML = [
-    chip(c.chainReady ? "ok" : "bad", c.chainReady ? "Stellar Testnet" : "Wallets missing", c.chainReady ? "Noir contracts via @noirx402/agent-sdk" : c.missing.join(", ")),
+    c.mode === "simulation"
+      ? chip("warn", "Simulation mode", "Contracts run in memory with the same rules. No Testnet transactions.")
+      : chip(c.chainReady ? "ok" : "bad", c.chainReady ? "Stellar Testnet · live" : "Wallets missing", c.chainReady ? "Noir contracts via @noirx402/agent-sdk" : c.missing.join(", ")),
     chip(c.veloCheckout ? "ok" : "warn", c.veloCheckout ? "Velo checkout live" : "Velo checkout simulated", "VELO_API_KEY"),
-    chip(c.llm ? "ok" : "", c.llm ? "LLM reasoning on" : "Rules agent", "LLM_API_KEY"),
+    chip(c.llm ? "ok" : "", c.llm ? "LLM-worded reasons" : "Rules agent", c.llm ? "An LLM writes the reason text; amounts and gates stay deterministic" : "Deterministic rules agent (set LLM_API_KEY for LLM-written reasons)"),
     `<span class="chip">${esc(S.invoice.id)}</span>`,
     `<span class="chip" title="Fixed demo conversion">1 XLM = ₱1,000</span>`,
   ].join("");
 }
 
 function renderBanner() {
+  const c = S.config;
   let html = "";
-  if (!S.config.chainReady) html = `<div class="banner bad">On-chain actions are disabled: missing ${esc(S.config.missing.join(", "))}. Run <code>npm run provision</code> or set the wallet env vars on the host.</div>`;
-  else if (S.error) html = `<div class="banner bad">${esc(S.error)}</div>`;
-  else if (S.status === "SETTLED") html = `<div class="banner ok">Invoice ${esc(S.invoice.id)} settled on Testnet. Escrow is ${fmtXlm(S.escrowXlm ?? 0)}. Every payout below links to Stellar Expert.</div>`;
+  if (!c.chainReady) html = `<div class="banner bad">On-chain actions are disabled: missing ${esc(c.missing.join(", "))}. Run <code>npm run provision</code>, set the wallet env vars, or ${button("mode/simulation", "Use simulation mode", { cls: "sm" })}</div>`;
+  else if (S.error)
+    html = `<div class="banner bad"><div><b>That step failed.</b> ${esc(S.error)}</div><div class="banner-actions">${button("reset", "↺ Reset and retry", { cls: "sm" })}${c.mode === "testnet" ? button("mode/simulation", "Continue in simulation mode", { cls: "sm" }) : ""}</div></div>`;
+  else if (c.mode === "simulation")
+    html = `<div class="banner warn"><div><b>Simulation mode.</b> The Noir contracts run in memory with the same rules (per-payment cap, escrow, revoke). Transactions are labelled <span class="sim-tag">simulated</span> and are not on Stellar.${c.missing.length ? ` Testnet wallets are not configured (${esc(c.missing.join(", "))}).` : ""}</div>${c.canGoLive ? `<div class="banner-actions">${button("mode/testnet", "Switch to Stellar Testnet", { cls: "sm" })}</div>` : ""}</div>`;
+  else if (S.status === "SETTLED") html = `<div class="banner ok">Invoice ${esc(S.invoice.id)} settled on Stellar Testnet. Escrow is ${fmtXlm(S.escrowXlm ?? 0)}. Every payout below links to Stellar Expert.</div>`;
   $("#banner").innerHTML = html;
+  $("#ledger-note").textContent = c.mode === "simulation" ? "simulation mode: no explorer links" : "every transaction links to Stellar Expert (Testnet)";
+}
+
+// ---------------- guided journey ----------------
+function stage() {
+  const p = S.invoice.payouts;
+  const st = S.status;
+  const auto = S.autopilot;
+  const pay = S.payment;
+  const map = {
+    DRAFT: ["Invoice ready", `A ₱1,000,000 freight invoice (${fmtXlm(S.invoice.faceXlm)}) from MV VisMin Pioneer to Isla Beverages, due in 60 days. Nothing is on-chain yet.`, ["tokenize", "Register invoice on-chain"]],
+    TOKENIZED: ["Invoice registered", `The invoice hash is on-chain and the agent has a spending cap of ${fmtXlm(p.maxAmount)} per payment.`, ["fund", "Fund the 85% advance (investor)"]],
+    FUNDED: ["Advance funded", `An investor locked ${fmtXlm(p.advance)} in escrow. The agent will release it once AIS shows the ship underway.`, ["depart", "Depart Manila"]],
+    ADVANCED: ["Advance paid", `The agent saw the vessel underway and paid the shipowner ${fmtXlm(p.advance)}.`, ["fast-forward", "⏩ Fast-forward to Cebu"]],
+    IN_TRANSIT: ["Ship at sea", "Position reports stream in. Settlement waits until the ship berths inside the Cebu port geofence.", ["fast-forward", "⏩ Fast-forward to Cebu"]],
+    BERTHED: ["Cargo delivered", "The ship berthed in Cebu and the agent signed a proof of delivery. Now the cargo owner pays the invoice.", S.checkout ? ["simulate-webhook", "Debtor pays (Velo webhook)"] : ["checkout", "Create Velo checkout for the debtor"]],
+    PAID: ["Debtor paid", "Velo confirmed the payment with a signed webhook. The agent is checking the split and settling.", null],
+    SETTLED: ["Settled", `Investor repaid ${fmtXlm(p.lpRepayment)}, shipowner rebated ${fmtXlm(p.rebate)}, treasury fee ${fmtXlm(p.fee)}. Escrow is empty.`, null],
+    HOLD: ["On hold", "The agent stopped because a check failed. No money moved. The reason is in the decision list.", null],
+    DEFAULT: ["Default recovered", "The debtor did not pay. Ops revoked the agent and swept the escrow back to the treasury.", null],
+  };
+  const [title, text, next] = map[st] || [st, "", null];
+  const nStep = Math.max(0, rank(st === "HOLD" ? S.holdFrom || "DRAFT" : st === "DEFAULT" ? "FUNDED" : st));
+  let manual = next;
+  if (st === "FUNDED" && S.voyage.running) manual = ["fast-forward", "⏩ Fast-forward to Cebu"];
+  if (st === "BERTHED" && pay) manual = null;
+  return { title, text, manual, nStep, auto };
+}
+
+const SCENARIOS = () => [
+  { act: "run-demo", label: "Clean settlement", text: "The whole voyage, from invoice to payout, with no clicks (about 90 seconds).", enabled: chainReady() },
+  { act: "guardrail", label: "Agent tries to overspend", text: `A single ${fmtXlm(S.invoice.faceXlm)} payout against the ${fmtXlm(S.invoice.payouts.maxAmount)} cap. The contract refuses it.`, enabled: chainReady() && !!S.invoice.hash, hint: "available after the invoice is registered" },
+  { act: "default", label: "Debtor never pays", text: "Ops revokes the agent and the escrow is swept back to the treasury.", enabled: chainReady() && ["FUNDED", "ADVANCED", "IN_TRANSIT", "BERTHED", "HOLD"].includes(S.status), hint: "available once the advance is funded" },
+];
+
+function renderGuide() {
+  const g = stage();
+  const st = S.status;
+  const done = ["SETTLED", "HOLD", "DEFAULT"].includes(st);
+  const working = S.busy ? `<p class="guide-busy" role="status"><span class="spin" aria-hidden="true"></span>${esc(S.busy)}…${S.voyage.running ? " · voyage streaming" : ""}</p>` : S.voyage.running ? `<p class="guide-busy" role="status"><span class="spin" aria-hidden="true"></span>Voyage streaming, the agent is watching AIS…</p>` : "";
+  const primary = done
+    ? button("run-demo", "▶ Run it again", { cls: "primary lg", enabled: chainReady() })
+    : st === "DRAFT"
+      ? button("run-demo", "▶ Run the full flow", { cls: "primary lg", enabled: chainReady(), title: "Drives every step automatically" })
+      : g.manual
+        ? button(g.manual[0], g.manual[1], { cls: "primary lg", enabled: chainReady() || g.manual[0] === "simulate-webhook" })
+        : "";
+  const secondary = st === "DRAFT" && g.manual ? button(g.manual[0], `or step by step: ${g.manual[1]}`, { cls: "ghost", enabled: chainReady() }) : !done && st !== "DRAFT" ? button("reset", "↺ Start over", { cls: "ghost" }) : button("reset", "↺ Reset", { cls: "ghost" });
+  const mode = S.config.mode;
+  $("#guide").innerHTML = `
+    <div class="guide-main">
+      <p class="guide-kicker">${done ? "Finished" : `Next: step ${g.nStep + 1} of ${STEPS.length}, ${esc(STEPS[g.nStep].replace("_", " ").toLowerCase())}`} · ${S.autopilot ? "autopilot" : "you drive"}</p>
+      <h2 class="guide-title">${esc(g.title)}</h2>
+      <p class="guide-text">${esc(g.text)}</p>
+      ${working}
+      <div class="guide-actions">${primary}${secondary}</div>
+    </div>
+    <div class="guide-side">
+      <h3 class="guide-h">Try a scenario</h3>
+      <ul class="scenarios">${SCENARIOS()
+        .map((x) => `<li>${button(x.act, x.label, { cls: "scenario", enabled: x.enabled, title: x.enabled ? x.text : x.hint || "" })}<span class="muted small">${esc(x.text)}${!x.enabled && x.hint ? ` <i>(${esc(x.hint)})</i>` : ""}</span></li>`)
+        .join("")}</ul>
+      <div class="modeswitch" role="group" aria-label="Chain mode">
+        <span class="small muted">Chain</span>
+        ${button("mode/testnet", "Stellar Testnet", { cls: `seg ${mode === "testnet" ? "on" : ""}`, enabled: mode !== "testnet" && S.config.canGoLive, title: S.config.canGoLive ? "Real Testnet transactions" : "Testnet wallets are not configured on this host" })}
+        ${button("mode/simulation", "Simulation", { cls: `seg ${mode === "simulation" ? "on" : ""}`, enabled: mode !== "simulation", title: "In-memory contracts with the same rules; use if Testnet is down" })}
+      </div>
+    </div>`;
 }
 
 function renderPipeline() {
@@ -237,9 +334,6 @@ function opsPanel() {
       <div class="stat"><div class="k">Status</div><div class="v" style="font-size:15px">${esc(S.status)}</div></div>
       <div class="stat"><div class="k">Escrow</div><div class="v">${fmtXlm(S.escrowXlm)}</div></div>
     </div>
-    <div class="actions">
-      ${button("run-demo", "▶ Run Demo", { cls: "gold block", enabled: chainReady(), title: "Drives the full loop on Testnet in about 90 seconds" })}
-    </div>
     ${
       g
         ? `<div class="callout ${g.unexpectedSuccess ? "red" : "teal"}"><div class="sub">Guardrail · ${esc(time(g.ranAt))}</div><div style="font-weight:700;margin:2px 0">${g.unexpectedSuccess ? "NOT refused!" : `Refused on-chain policy: ${esc(g.checkPayment?.reason || "")}`}</div><div class="sub">${esc(g.summary)}</div></div>`
@@ -302,11 +396,11 @@ function chartSvg() {
   return `
   <svg viewBox="0 0 ${BOX.w} ${BOX.h}" role="img" aria-label="Voyage chart Manila to Cebu">
     <style>
-      .g{stroke:#13284a;stroke-width:1}.gt{fill:#2c4670;font:10px ui-monospace,monospace}
-      .land{fill:#132a3f;stroke:#21466a;stroke-width:1}
-      .route{fill:none;stroke:#2a4d7a;stroke-width:2;stroke-dasharray:5 6}
-      .done{fill:none;stroke:#2dd4bf;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
-      .port{fill:#f5b94a}.pl{fill:#e7eefb;font:600 11px Inter,system-ui,sans-serif}.ps{fill:#8c9cbb;font:10px Inter,system-ui,sans-serif}
+      .g{stroke:#0f3b3a;stroke-width:1}.gt{fill:#5f8f8b;font:10px ui-monospace,monospace}
+      .land{fill:#123f3b;stroke:#1f5a54;stroke-width:1}
+      .route{fill:none;stroke:#3c7b78;stroke-width:2;stroke-dasharray:5 6}
+      .done{fill:none;stroke:#4cc9dc;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+      .port{fill:#f47b00}.pl{fill:#ffffff;font:600 11px "Plus Jakarta Sans",system-ui,sans-serif}.ps{fill:#a7c4c1;font:10px "Plus Jakarta Sans",system-ui,sans-serif}
       .fence{fill:${berthed ? "rgba(52,211,153,.18)" : "rgba(96,165,250,.08)"};stroke:${berthed ? "#34d399" : "#3b6fb0"};stroke-width:1.5;stroke-dasharray:${berthed ? "0" : "3 3"}}
     </style>
     ${grid.join("")}
@@ -322,8 +416,8 @@ function chartSvg() {
     <text x="${px(12.75, 122.25)[0]}" y="${px(12.75, 122.25)[1]}" class="ps">Sibuyan Sea</text>
     <text x="${px(11.55, 123.3)[0]}" y="${px(11.55, 123.3)[1]}" class="ps">Visayan Sea</text>
     <g transform="translate(${ship[0].toFixed(1)},${ship[1].toFixed(1)}) rotate(${t ? t.cog : 200})">
-      <circle r="11" fill="rgba(245,185,74,.18)"><animate attributeName="r" values="9;14;9" dur="2s" repeatCount="indefinite"/></circle>
-      <path d="M0,-9 L5,6 L0,3 L-5,6 Z" fill="#f5b94a" stroke="#2a1a00" stroke-width="1"/>
+      <circle r="11" fill="rgba(244,123,0,.2)"><animate attributeName="r" values="9;14;9" dur="2s" repeatCount="indefinite"/></circle>
+      <path d="M0,-9 L5,6 L0,3 L-5,6 Z" fill="#f47b00" stroke="#1e1307" stroke-width="1"/>
     </g>
   </svg>`;
 }
@@ -360,30 +454,58 @@ function renderKpis() {
   const settled = S.status === "SETTLED";
   const claimed = (S.txs || []).filter((t) => /claim/.test(t.label)).length;
   $("#kpis").innerHTML = `
-    <div class="card-head"><h2>Money flow</h2><span class="muted small">integer stroops · parts always sum to face value</span></div>
+    <div class="card-head"><h2>Money flow</h2><span class="muted small">exact integer accounting: parts always sum to the invoice</span></div>
     <div class="kpis">
       <div class="stat"><div class="k">Escrow now</div><div class="v">${fmtXlm(S.escrowXlm)}</div><div class="s">${S.escrowXlm != null ? fmtPhp(S.escrowXlm) : "not funded"}</div></div>
-      <div class="stat"><div class="k">LP repayment</div><div class="v">${fmtXlm(p.lpRepayment)}</div><div class="s">advance + 3% yield</div></div>
+      <div class="stat"><div class="k">Investor repayment</div><div class="v">${fmtXlm(p.lpRepayment)}</div><div class="s">advance + 3% yield</div></div>
       <div class="stat"><div class="k">Shipowner rebate</div><div class="v">${fmtXlm(p.rebate)}</div><div class="s">reserve minus yield & fee</div></div>
       <div class="stat"><div class="k">Protocol fee</div><div class="v">${fmtXlm(p.fee)}</div><div class="s">0.5% to treasury</div></div>
     </div>
+    <dl class="glossary">
+      <div><dt>Escrow</dt><dd>Money locked for this one invoice. Only the agent can release it, and only within its on-chain cap.</dd></div>
+      <div><dt>Advance</dt><dd>85% of the invoice paid to the shipowner when the ship sails, so fuel and port dues are covered.</dd></div>
+      <div><dt>Rebate</dt><dd>The 15% held back, returned to the shipowner after the debtor pays, minus the investor's yield and the fee.</dd></div>
+      <div><dt>Settlement</dt><dd>When the debtor pays, the agent splits the money: investor first, then rebate, then fee.</dd></div>
+    </dl>
     <div class="conserve ${settled ? "" : "muted"}">${settled ? `✓ Conservation: ${p.lpRepayment} + ${p.rebate} + ${p.fee} = ${S.invoice.faceXlm} XLM settled · ${claimed} claims landed · escrow ${fmtXlm(S.escrowXlm ?? 0)}` : `Settlement split: ${p.lpRepayment} + ${p.rebate} + ${p.fee} = ${S.invoice.faceXlm} XLM`}</div>`;
+}
+
+// What the executor verified before (or instead of) moving money. Mirrors packages/agent/src/executor.ts.
+const seen = new Set();
+const fresh = new Set();
+let seenInit = false;
+function trace(d) {
+  const ok = (t) => ({ t, s: "ok" });
+  const bad = (t) => ({ t, s: "bad" });
+  const cap = S.invoice.payouts.maxAmount;
+  if (d.decision === "ADVANCE" && d.ok)
+    return [ok("Invoice registered by Sailo"), ok("Escrow funded and in FUNDED state"), ok("AIS: vessel underway"), ok("Payout recomputed: 85% of face to SHIPOWNER"), ok(`checkPayment: within ${cap} XLM cap`), ok("authorize + claim sent")];
+  if (d.decision === "SETTLE" && d.ok)
+    return [ok("Velo webhook signature verified"), ok("Paid amount equals invoice"), ok("Berthing attestation signed"), ok("Split recomputed and sums to face value"), ok(`checkPayment: each payout within ${cap} XLM cap`), ok("3 authorize + claims sent")];
+  if (d.decision === "BERTHED") return [ok("Inside the 800 m Cebu geofence"), ok("Speed ≤ 0.5 kn for 3 readings"), ok("Record hashed and signed by the agent key")];
+  if (d.decision === "REFUSED") return [ok(`Tried one ${fmtXlm(S.invoice.faceXlm)} payout`), bad(`checkPayment → ${d.refusal || "over_limit"}`), bad("SDK refused at simulation · no transaction, no fee")];
+  if (d.decision === "DEFAULT") return [ok("Ops-triggered default"), ok("Agent revoked"), ok("Escrow swept to treasury")];
+  if (d.refusal) return [bad(`Stopped: ${d.refusal}`), ok("No money moved")];
+  return [];
 }
 
 function renderDecisions() {
   const list = [...(S.decisions || [])].reverse();
   if (!list.length) {
-    $("#decisions").innerHTML = `<div class="empty">No decisions yet.<br/>Tokenize, fund and depart, or press <b>▶ Run Demo</b>. The agent decides on its own as facts arrive.</div>`;
+    $("#decisions").innerHTML = `<div class="empty">No decisions yet.<br/>Press <b>▶ Run the full flow</b> above. The agent decides on its own as facts arrive, and every check it makes shows up here.</div>`;
     return;
   }
+  for (const d of list) if (!seen.has(d.id)) { seen.add(d.id); if (seenInit) { fresh.add(d.id); setTimeout(() => fresh.delete(d.id), 3000); } }
+  seenInit = true;
   $("#decisions").innerHTML = list
-    .map((d) => {
+    .map((d, i) => {
       const pills = d.payouts.map((p) => `<span class="pill ${esc(p.role)} ${d.decision === "REFUSED" ? "strike" : ""}">${esc(p.role)}: ${esc(p.xlm)} XLM</span>`).join("");
       const txs = d.txs.map((t) => `<div><span class="muted">${esc(t.step)} ${esc(t.role)}</span> · ${txLink(t)}</div>`).join("");
       const refusal = d.refusal ? `<div class="small" style="margin-top:6px;color:${d.decision === "REFUSED" ? "#c4b5fd" : "var(--amber)"}">refusal: <b>${esc(d.refusal)}</b>${d.detail ? ` · ${esc(d.detail)}` : ""}</div>` : "";
       return `<article class="dec" data-dec="${esc(d.id)}" tabindex="0" aria-haspopup="dialog">
         <div class="dec-head"><span class="badge b-${esc(d.decision)}">${esc(d.decision)}</span>${d.requested !== d.decision ? `<span class="engine">requested ${esc(d.requested)}</span>` : ""}<span class="engine">${esc(d.engine)}</span><span class="dec-time">${esc(time(d.at))}</span></div>
         <div class="dec-reason">${esc(d.reason)}</div>
+        ${(() => { const tr = trace(d); return tr.length ? `<ol class="trace${i === 0 && fresh.has(d.id) ? " live" : ""}" aria-label="Checks">${tr.map((x, k) => `<li class="${x.s}" style="--i:${k}"><span aria-hidden="true">${x.s === "ok" ? "✓" : "✕"}</span>${esc(x.t)}</li>`).join("")}</ol>` : ""; })()}
         ${pills ? `<div class="pills">${pills}</div>` : ""}
         ${refusal}
         ${txs ? `<div class="dec-txs">${txs}</div>` : ""}
@@ -397,9 +519,9 @@ function renderLedger() {
   const txs = [...(S.txs || [])].reverse();
   $("#ledger").innerHTML = txs.length
     ? `<table><thead><tr><th>Time</th><th>Call</th><th>Signer</th><th>Transaction</th></tr></thead><tbody>${txs
-        .map((t) => `<tr><td class="muted">${esc(time(t.at))}</td><td>${esc(t.label)}</td><td><span class="role-tag">${esc(t.role)}</span></td><td class="mono">${txLink(t)}</td></tr>`)
+        .map((t) => `<tr><td class="muted tnum" data-label="Time">${esc(time(t.at))}</td><td data-label="Call">${esc(t.label)}</td><td data-label="Signer"><span class="role-tag">${esc(t.role)}</span></td><td class="mono" data-label="Transaction">${txLink(t)}</td></tr>`)
         .join("")}</tbody></table>`
-    : `<div class="empty">Transactions appear here as they land on Stellar Testnet.</div>`;
+    : `<div class="empty">${isSim() ? "Simulated transactions appear here as the flow runs." : "Transactions appear here as they land on Stellar Testnet."}</div>`;
 }
 
 function renderOps() {
@@ -411,8 +533,9 @@ function renderOps() {
     button("guardrail", "Trigger guardrail (1,000 XLM)", { enabled: chainReady() && !!S.invoice.hash }),
     button("default", "Simulate default + recover", { cls: "danger", enabled: chainReady() && ["FUNDED", "ADVANCED", "IN_TRANSIT", "BERTHED", "HOLD"].includes(st) }),
     button("reset", "↺ Reset demo", { enabled: true }),
+    isSim() ? button("mode/testnet", "Use Stellar Testnet", { enabled: S.config.canGoLive }) : button("mode/simulation", "Use simulation", {}),
   ];
-  $("#ops-actions").innerHTML = actions.join("") + `<div class="small muted" style="width:100%;margin-top:4px">Every button makes real Testnet calls except the simulated webhook delivery, which is HMAC-signed and verified by the same code path as a real Velo webhook.</div>`;
+  $("#ops-actions").innerHTML = actions.join("") + `<div class="small muted" style="width:100%;margin-top:4px">${isSim() ? "Simulation mode: contract calls run in memory." : "Every button makes real Testnet calls"} The simulated webhook delivery is HMAC-signed and verified by the same code path as a real Velo webhook.</div>`;
   $("#ops-busy").innerHTML = S.busy ? `<span class="busy-pill"><span class="spin" style="width:10px;height:10px;border-width:2px;border-radius:50%;border-style:solid;border-right-color:transparent;display:inline-block;animation:spin .8s linear infinite"></span>${esc(S.busy)}…</span>` : S.voyage.running ? `<span class="busy-pill">voyage streaming…</span>` : "";
   const box = $("#ops-log");
   const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 30;
@@ -432,7 +555,7 @@ function focusKey(el) {
 function render() {
   if (!S) return;
   const key = focusKey(document.activeElement);
-  const scrollers = ["#decisions", "#ops-log", "#ops-actions"].map((q) => [q, $(q)?.scrollTop || 0]);
+  const scrollers = ["#decisions", "#ops-log", "#ops-actions", "#ledger"].map((q) => [q, $(q)?.scrollTop || 0]);
   renderAll();
   for (const [q, top] of scrollers) { const el = $(q); if (el) el.scrollTop = top; }
   if (key) {
@@ -441,7 +564,9 @@ function render() {
   }
 }
 function renderAll() {
+  noteBaseline();
   renderChips();
+  renderGuide();
   renderBanner();
   renderPipeline();
   renderRolePanel();
@@ -479,6 +604,11 @@ function openDecision(id) {
 document.addEventListener("click", (e) => {
   const el = e.target instanceof Element ? e.target : null;
   if (!el) return;
+  const cp = el.closest("[data-copy]");
+  if (cp) {
+    navigator.clipboard?.writeText(cp.dataset.copy).then(() => toast("Copied to clipboard"), () => toast("Copy failed", true));
+    return;
+  }
   const a = el.closest("[data-act]");
   if (a && !a.disabled) return void act(a.dataset.act, a.dataset.label);
   const r = el.closest("#roles button");
@@ -516,7 +646,7 @@ $("#ops-toggle").addEventListener("click", () => {
   document.body.style.paddingBottom = o.classList.contains("collapsed") ? "60px" : "";
 });
 
-if (window.matchMedia("(max-width: 800px)").matches) {
+{ // the guide above carries every action; the ops panel starts collapsed
   $("#ops").classList.add("collapsed");
   $("#ops-toggle").setAttribute("aria-expanded", "false");
   document.body.style.paddingBottom = "60px";

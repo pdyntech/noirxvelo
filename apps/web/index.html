@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+  <link rel="stylesheet" href="/tokens.css" />
   <link rel="stylesheet" href="/landing.css" />
 </head>
 <body>
@@ -20,8 +21,9 @@
         <a href="#how">How it works</a>
         <a href="#numbers">Numbers</a>
         <a href="#guardrails">Guardrails</a>
+        <a href="#proof">Proof</a>
       </div>
-      <a class="btn btn-orange nav-cta" href="/app">Get started</a>
+      <a class="btn btn-orange nav-cta" href="/app">Open live demo</a>
     </nav>
 
     <div class="wrap hero-body">
@@ -38,7 +40,7 @@
       <p class="tagline">Freight advances for island shipping lines, guarded by an AI that can’t overspend.</p>
 
       <div class="cta-row">
-        <a class="btn btn-orange btn-lg" href="/app">Get started <span aria-hidden="true">→</span></a>
+        <a class="btn btn-orange btn-lg" href="/app">Run the live demo <span aria-hidden="true">→</span></a>
         <a class="btn btn-ghost btn-lg" href="#how">How it works</a>
       </div>
 
@@ -108,9 +110,33 @@
       </div>
     </section>
 
+
+    <section class="section" id="proof">
+      <div class="wrap two-col">
+        <div>
+          <p class="eyebrow">Proof</p>
+          <h2>Real transactions on Stellar Testnet.</h2>
+          <p class="note">Recorded 6 Nov 2026 by the team's lifecycle and default scripts through the same agent code the demo uses. Open any hash on Stellar Expert.</p>
+        </div>
+        <div>
+          <ul class="proof">
+            <li><span>Invoice registered (device_registry)</span><a href="https://stellar.expert/explorer/testnet/tx/9ba6b79cf1b1732d2583f583f2cb7c2674fddf1badb8bc2f6dff2f044ec97c5f" target="_blank" rel="noopener"><code>9ba6b79c…7c5f</code> ↗</a></li>
+            <li><span>Agent policy, 880 XLM cap</span><a href="https://stellar.expert/explorer/testnet/tx/9bde02602a5a3f4b55f967339d1953133d366b403452647f7d1bb801c5614faa" target="_blank" rel="noopener"><code>9bde0260…4faa</code> ↗</a></li>
+            <li><span>Investor funds 850 XLM escrow</span><a href="https://stellar.expert/explorer/testnet/tx/3d546679502258b0e8e8d63ff023cca458aeb3a6270142527b233a653e249dd7" target="_blank" rel="noopener"><code>3d546679…9dd7</code> ↗</a></li>
+            <li><span>Agent authorizes 850 XLM advance</span><a href="https://stellar.expert/explorer/testnet/tx/d8899a5bff111ea3a82daa4b421100f88a8589d10c506197aadf5700e2b82385" target="_blank" rel="noopener"><code>d8899a5b…2385</code> ↗</a></li>
+            <li><span>Shipowner claims the advance</span><a href="https://stellar.expert/explorer/testnet/tx/0c540e3762d646d2eb84bd1bdfd377f4229c0be974cce5c7d66c8b77989a392c" target="_blank" rel="noopener"><code>0c540e37…392c</code> ↗</a></li>
+            <li><span>Default: agent revoked, escrow swept</span><a href="https://stellar.expert/explorer/testnet/tx/eb14b8b43ad44912e29afe9a29de69d23845183a52f389737bef4f6982578d6d" target="_blank" rel="noopener"><code>eb14b8b4…8d6d</code> ↗</a></li>
+          </ul>
+          <dl class="realsim">
+            <div><dt>Real</dt><dd>Noir contracts on Stellar Testnet, every escrow, authorize and claim, the per-payment cap, and the HMAC check on Velo webhooks.</dd></div>
+            <div><dt>Simulated</dt><dd>The vessel's AIS positions, the fixed 1 XLM = ₱1,000 rate, and the debtor's payment when no Velo API key is set. The demo can also run its contracts in memory if Testnet is down, and labels that clearly.</dd></div>
+          </dl>
+        </div>
+      </div>
+    </section>
     <section class="section cta-band">
       <div class="wrap cta-inner">
-        <h2>See a full voyage settle on Testnet.</h2>
+        <h2>Watch a full voyage settle, in about 90 seconds.</h2>
         <a class="btn btn-orange btn-lg" href="/app">Open the live demo <span aria-hidden="true">→</span></a>
       </div>
     </section>

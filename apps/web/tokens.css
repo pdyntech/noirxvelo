@@ -1,0 +1,48 @@
+/* Sailo design tokens: the single source for the landing page (/) and the live demo (/app). */
+:root {
+  /* type */
+  --sl-font: "Plus Jakarta Sans", "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sl-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* surfaces: deep sea-teal, darkest first */
+  --sl-bg-0: #071b1a;
+  --sl-bg-1: #0a2422;
+  --sl-surface: #0e2d2b;
+  --sl-surface-2: #133a37;
+  --sl-surface-3: #1b4a45;
+  --sl-line: rgba(255, 255, 255, .10);
+  --sl-line-2: rgba(255, 255, 255, .20);
+
+  /* ink (all >= 4.5:1 on --sl-surface) */
+  --sl-ink: #ffffff;
+  --sl-ink-2: rgba(255, 255, 255, .84);
+  --sl-ink-3: rgba(255, 255, 255, .66);
+
+  /* meaning: orange = primary action, cyan = live / info, green = confirmed money movement */
+  --sl-accent: #f47b00;
+  --sl-accent-h: #ff8c1a;
+  --sl-on-accent: #1e1307;
+  --sl-live: #4cc9dc;
+  --sl-ok: #3ddc97;
+  --sl-warn: #fbbf24;
+  --sl-bad: #f87171;
+  --sl-violet: #c4b5fd;
+
+  /* shape */
+  --sl-r-sm: 8px;
+  --sl-r: 12px;
+  --sl-r-lg: 16px;
+  --sl-r-xl: 22px;
+
+  /* spacing scale */
+  --sl-1: 4px;
+  --sl-2: 8px;
+  --sl-3: 12px;
+  --sl-4: 16px;
+  --sl-5: 24px;
+  --sl-6: 32px;
+
+  --sl-focus: #ffd2a3;
+  color-scheme: dark;
+}
+.tnum, .mono, code { font-variant-numeric: tabular-nums; }

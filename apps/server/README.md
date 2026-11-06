@@ -34,6 +34,7 @@ Every step is also a manual button in the Shipowner, Investor and Debtor views.
 | `APP_URL` | on deploy | Public URL, used for checkout success and cancel links |
 | `LLM_API_KEY`, `LLM_MODEL` | no | An LLM writes the decision reason. The amounts always come from code |
 | `DEMO_TICK_MS` | no | AIS tick interval, default 1800 |
+| `SIMULATE_CHAIN` | no | `1` runs the Noir contracts in memory (labelled "simulated", no Testnet). Also used automatically when wallet keys are missing; the dashboard can switch modes at runtime |
 
 ## Deploy (Render or Railway, not Vercel)
 

@@ -699,7 +699,7 @@ export function simulateDefault() {
     const ctx: ExecutorContext = {
       ...execContext(state.status === "HOLD" ? (state.holdFrom ?? "FUNDED") : state.status),
       gates: { ...execContext("FUNDED").gates, webhookVerified: false, dueDatePlusGracePassed: true },
-      recovery: () => defaultRecovery({ client: getClient(), ownerSigner: s.TREASURY, deviceHash: state.invoice.hash!, agent: s.AGENT }),
+      recovery: () => defaultRecovery({ client: getClient(), ownerSigner: s.TREASURY, deviceHash: state.invoice.hash!, agent: s.AGENT, ...(simMode ? { readTreasuryBalance: async (acct: string) => getSim().ledger.balance(acct) } : {}) }),
     };
     const result = await serial(() => execute(decision, ctx));
     recordDecision(decision, "rules", result);
