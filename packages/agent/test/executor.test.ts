@@ -184,7 +184,9 @@ describe("execute: happy paths", () => {
   });
   it("HOLD and DEFAULT send nothing", async () => {
     for (const decision of ["HOLD", "DEFAULT"] as const) {
-      const { ctx, client } = mkCtx();
+      const { ctx, client } = mkCtx({
+        gates: { hashRegisteredByUs: true, vesselUnderway: true, webhookVerified: false, berthingAttestation: false, dueDatePlusGracePassed: true },
+      });
       const r = await execute({ invoiceId: "INV-2026-001", decision, reason: "x", payouts: [] }, ctx);
       expect(r).toMatchObject({ decision, ok: true, steps: [] });
       expect(client.authorizePayment).not.toHaveBeenCalled();
