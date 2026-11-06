@@ -25,14 +25,22 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  /* Teal wash over the port photo (add apps/web/assets/hero-port.jpg); the gradient underneath is the fallback. */
+  /* Gradient fallback; the photo layer is .hero::before (apps/web/assets/hero-port.jpg). */
   background:
-    linear-gradient(180deg, rgba(24, 74, 66, .72) 0%, rgba(20, 66, 60, .66) 45%, rgba(14, 50, 48, .82) 100%),
-    url("/assets/hero-port.jpg") center / cover no-repeat,
     radial-gradient(900px 520px at 78% 38%, rgba(214, 168, 92, .32) 0%, transparent 60%),
     radial-gradient(1100px 600px at 62% 70%, #2f6c62 0%, transparent 70%),
     linear-gradient(170deg, #2a5a50 0%, #1e4b45 40%, #143834 100%);
   overflow: hidden;
+}
+.hero::before { /* port photo, desaturated then washed teal-green like the reference */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(22, 84, 70, .66) 0%, rgba(20, 78, 66, .52) 50%, rgba(12, 52, 46, .7) 100%),
+    url("/assets/hero-port.jpg") center 74% / cover no-repeat;
+  filter: saturate(.75) contrast(1.06);
 }
 .hero::after { /* soft vignette like the reference */
   content: "";
