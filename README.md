@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="apps/web/assets/hero.jpg" alt="Sailo: a cargo port at dusk" width="720">
+  <img src="apps/web/assets/logo.png" alt="Sailo logo" width="160">
 </p>
 
 <h1 align="center">Sailo</h1>
@@ -275,7 +275,7 @@ noirxvelo/
 │   └── web/                    # Static frontend (no build step)
 │       ├── index.html          # Sailo landing page + portal (site.js, portal.js)
 │       ├── app/index.html      # Live Testnet demo (/app)
-│       └── assets/             # hero.jpg, voyage.jpg
+│       └── assets/             # hero.jpg, voyage.jpg, logo.png
 ├── packages/
 │   ├── agent/                  # NoirAgentClient, executor, guardrail, recovery, mutex
 │   └── shared/                 # Types, canonical waybill hash, payout math, seed data, store
