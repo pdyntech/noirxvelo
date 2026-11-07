@@ -416,7 +416,7 @@ npm run default-demo      # default + recovery on Testnet
 
 | Member | GitHub | Lane |
 | :-- | :-- | :-- |
-| Helena | [@helenaherrero515](https://github.com/helenaherrero515) | Product, pitch, frontend |
+| Helena | [@helenaherrero515](https://github.com/helenaherrero515) | Fullstack Developer and DevOps  |
 | Ethan | [@thanreiz](https://github.com/thanreiz) | Blockchain: Noir client, executor, guardrail, recovery, Testnet proof |
 | Dia Aviles | [@krstndiane](https://github.com/krstndiane) | Project manager, frontend |
 
