@@ -6,3 +6,4 @@ dist
 .next
 *.log
 apps/server/data/
+.vercel

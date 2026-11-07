@@ -318,7 +318,7 @@ npm run lifecycle         # full Noir lifecycle on Testnet, prints Stellar Exper
 npm run default-demo      # default + recovery on Testnet
 ```
 
-**Deploy:** use Render or Railway (a long-running process), not serverless. Start command `npm start`, Node 24. Point `DATA_DIR` at a persistent disk, or accounts reset on each deploy. Then set the Velo webhook URL to `https://<your-host>/api/webhooks/velo`. Health check: `GET /api/health`. See [`apps/server/README.md`](apps/server/README.md).
+**Deploy:** Render or Railway (a long-running process) gives the most reliable demo. Vercel also works (`vercel.json` is included), but accounts and demo state reset when the function restarts. Start command `npm start`, Node 24. Point `DATA_DIR` at a persistent disk, or accounts reset on each deploy. Then set the Velo webhook URL to `https://<your-host>/api/webhooks/velo`. Health check: `GET /api/health`. See [`apps/server/README.md`](apps/server/README.md).
 
 ---
 

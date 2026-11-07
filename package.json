@@ -15,10 +15,12 @@
     "default-demo": "tsx scripts/default-demo.ts",
     "test": "vitest run",
     "start": "npm run start -w @noirxvelo/server",
-    "dev": "npm run dev -w @noirxvelo/server"
+    "dev": "npm run dev -w @noirxvelo/server",
+    "build": "tsx scripts/build-vercel.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "esbuild": "0.28.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"

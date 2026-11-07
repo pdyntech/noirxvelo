@@ -39,7 +39,7 @@ Every step is also a manual button in the Shipowner, Investor and Debtor views.
 - **Sample data.** Each new account gets a few private sample invoices whose missing counterparty is simulated, so the portal is never empty.
 - **Forms.** The enquiry form (`POST /api/enquiry`) and newsletter (`POST /api/subscribe`) are saved on the server.
 
-Everything is stored in `apps/server/data/sailo.json` (git-ignored). Set `DATA_DIR` to a persistent disk on Render or Railway, or accounts reset on each deploy. `PORTAL_VOYAGE_MS` (default 20000) sets how long a portal voyage takes.
+Everything is stored in `apps/server/data/sailo.json` (git-ignored). Set `DATA_DIR` to a persistent disk on Render or Railway, or accounts reset on each deploy. On Vercel it defaults to `/tmp/sailo`, which is temporary. `PORTAL_VOYAGE_MS` (default 20000) sets how long a portal voyage takes.
 
 ## Environment
 
@@ -54,12 +54,17 @@ Everything is stored in `apps/server/data/sailo.json` (git-ignored). Set `DATA_D
 | `DEMO_TICK_MS` | no | AIS tick interval, default 1800 |
 | `SIMULATE_CHAIN` | no | `1` runs the Noir contracts in memory (labelled "simulated", no Testnet). Also used automatically when wallet keys are missing; the dashboard can switch modes at runtime |
 
-## Deploy (Render or Railway, not Vercel)
+## Deploy
 
-The demo keeps its state and the live event stream in one long-running process, so it needs a host that keeps the process alive. Serverless functions don't.
+**Render or Railway (best for the live demo).** The demo keeps its state and the live event stream in one long-running process, so a host that keeps the process alive gives the most reliable demo.
 
 - **Render:** New → Web Service → this repo. Build command `npm install --include=dev`, start command `npm start`, Node 24. Add the env vars above.
 - **Railway:** New project from the repo. Start command `npm start`. Add the env vars above. Set `NIXPACKS_NODE_VERSION=24`.
+
+**Vercel.** `vercel.json` and `npm run build` (`scripts/build-vercel.ts`) produce a [Build Output API](https://vercel.com/docs/build-output-api) deploy: `apps/web` is served as static files and the server is bundled into one function (`src/vercel.ts`) that handles `/api/*`. In the Vercel project settings use Framework Preset **Other**, leave Root Directory empty and don't override the build, install or output settings. Add the env vars above. Limits:
+
+- Accounts, portal invoices and demo state live in the function's memory and `/tmp`. They reset when Vercel recycles the instance and aren't shared between instances. Use Render or Railway if accounts must persist.
+- The event stream reconnects every 5 minutes (the function time limit). Background demo steps keep running through `waitUntil`.
 
 Then set the Velo webhook URL in the dashboard to `https://<your-host>/api/webhooks/velo`.
 
