@@ -135,31 +135,71 @@ svg.i{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .final h2{max-width:16ch}
 @media(max-width:640px){.sec{padding:72px 0}.final .in{padding:48px 28px}.hero p.sub{font-size:18px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-.how{position:relative;height:600vh;background:var(--teal);color:#fff}
-.pin{position:sticky;top:0;height:100svh;overflow:hidden;display:grid;grid-template-columns:minmax(330px,5fr) 7fr;align-items:center}
-.how-copy{grid-column:1;grid-row:1;position:relative;z-index:2;padding:0 24px 0 max(24px,calc((100vw - 1160px)/2))}
-.how-copy h2{font-size:clamp(28px,3.4vw,44px)}
-#gl{grid-column:2;grid-row:1;display:block;width:100%;height:100%}
-.how .steps{margin-top:26px}
-.how .steps::before{left:21px;top:22px;bottom:22px}
-.how .steps li{grid-template-columns:44px 1fr;gap:0 16px;padding:7px 0;opacity:.4;transition:opacity .3s}
-.how .steps li.on,.how.static .steps li{opacity:1}
-.how .steps .ic{width:44px;height:44px;grid-row:span 2;transition:background .3s,color .3s}
-.how .steps li.on .ic{background:var(--orange);border-color:var(--orange);color:var(--slate)}
-.how .steps h3{font-size:20px}
-.how .steps p{grid-column:2;margin:0;font-size:15px}
-.hint{margin-top:18px;font-size:14px;color:rgba(255,255,255,.7)}
+/* How it works: 3D scene full-bleed, steps in a frosted-glass panel */
+.how{position:relative;height:600vh;color:#fff;background:radial-gradient(55% 45% at 12% 18%,rgba(245,124,0,.32),transparent 70%),radial-gradient(45% 45% at 30% 85%,rgba(77,208,225,.22),transparent 70%),linear-gradient(160deg,#0B3D3B,#062624)}
+.pin{position:sticky;top:0;height:100svh;overflow:hidden;display:grid;grid-template-columns:minmax(380px,5fr) 7fr;align-items:center}
+#gl{grid-column:1/-1;grid-row:1;display:block;width:100%;height:100%}
+.how-copy{grid-column:1;grid-row:1;position:relative;z-index:2;padding:72px 24px 0 max(24px,calc((100vw - 1160px)/2))}
+.glass{position:relative;max-width:470px;padding:30px 26px 22px;border-radius:28px;background:linear-gradient(150deg,rgba(255,255,255,.16),rgba(255,255,255,.05) 55%,rgba(255,255,255,.08));border:1px solid rgba(255,255,255,.22);-webkit-backdrop-filter:blur(22px) saturate(1.6);backdrop-filter:blur(22px) saturate(1.6);box-shadow:0 30px 80px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.3)}
+.glass::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:radial-gradient(120% 60% at 0 0,rgba(255,255,255,.14),transparent 55%)}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#FFB15C;background:rgba(245,124,0,.14);border:1px solid rgba(245,124,0,.4)}
+.eyebrow svg.i{width:14px;height:14px}
+.how-copy h2{margin-top:16px;font-size:clamp(28px,3vw,40px)}
+.prog{display:flex;align-items:center;gap:14px;margin-top:20px;font-size:13px;font-weight:600;color:rgba(255,255,255,.7)}
+.prog .bar{flex:1;height:4px;border-radius:4px;background:rgba(255,255,255,.14);overflow:hidden}
+.prog .bar i{display:block;height:100%;width:calc(var(--step,1) / 6 * 100%);border-radius:inherit;background:linear-gradient(90deg,var(--orange),var(--cyan));transition:width .45s cubic-bezier(.2,.8,.2,1)}
+.prog b{color:#fff;font-variant-numeric:tabular-nums}
+.how .steps{margin-top:14px;gap:4px}
+.how .steps::before{left:33px;top:30px;bottom:30px;width:2px;opacity:.5}
+.how .steps li{grid-template-columns:44px 1fr;gap:0 16px;padding:9px 12px;border-radius:16px;border:1px solid transparent;opacity:.62;transition:opacity .35s,background .35s,border-color .35s,box-shadow .35s}
+.how .steps li.on{opacity:1;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.22);box-shadow:0 10px 28px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.18)}
+.how .steps .ic{width:44px;height:44px;grid-row:span 2;background:#0F3E3B;border:1px solid rgba(255,255,255,.28);transition:background .35s,color .35s,box-shadow .35s,border-color .35s}
+.how .steps .ic svg.i{width:20px;height:20px}
+.how .steps li.on .ic{background:var(--orange);border-color:#FFB15C;color:var(--slate);box-shadow:0 0 0 5px rgba(245,124,0,.18),0 0 26px rgba(245,124,0,.55)}
+.how .steps h3{font-size:19px}
+.how .steps p{grid-column:2;margin:0;font-size:15px;color:rgba(255,255,255,.78)}
+.hint{display:flex;align-items:center;gap:8px;margin:16px 0 0;padding-top:14px;border-top:1px solid rgba(255,255,255,.14);font-size:13px;color:rgba(255,255,255,.7)}
+.hint svg.i{width:16px;height:16px;animation:nudge 1.8s ease-in-out infinite}
+@keyframes nudge{50%{transform:translateY(3px)}}
 .how.static{height:auto}
 .how.static .pin{position:relative;height:auto;padding:96px 0;grid-template-columns:1fr}
-.how.static #gl,.how.static .hint{display:none}
+.how.static #gl,.how.static .hint,.how.static .prog{display:none}
+.how.static .how-copy{padding:0 24px;max-width:1208px;width:100%;margin:0 auto}
+.how.static .glass{max-width:none;padding:36px 32px 32px}
+.how.static .steps{margin-top:28px;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
+.how.static .steps::before{display:none}
+.how.static .steps li{opacity:1;padding:16px;background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
+.how.static .steps li .ic{background:var(--orange);border-color:#FFB15C;color:var(--slate);box-shadow:none}
+/* Short laptop screens: tighten the panel so all six steps fit under the nav */
+@media(min-width:861px) and (max-height:860px){
+.how-copy{padding-top:84px}
+.glass{padding:20px 22px 16px}
+.eyebrow{display:none}
+.how-copy h2{margin-top:0;font-size:clamp(24px,2.6vw,32px)}
+.prog{margin-top:14px}
+.how .steps{margin-top:10px;gap:2px}
+.how .steps li{padding:6px 10px;grid-template-columns:36px 1fr;gap:0 14px}
+.how .steps::before{left:27px;top:24px;bottom:24px}
+.how .steps .ic{width:36px;height:36px}
+.how .steps .ic svg.i{width:17px;height:17px}
+.how .steps h3{font-size:17px}
+.how .steps p{font-size:14px}
+.hint{margin-top:10px;padding-top:10px}
+}
+@media(min-width:861px) and (max-height:640px){.how .steps li:not(.on) p{display:none}}
 @media(max-width:860px){
 .pin{grid-template-columns:1fr;align-items:end}
 #gl{position:absolute;inset:0;grid-column:1}
-.how-copy{grid-column:1;padding-bottom:max(24px,env(safe-area-inset-bottom,0px));padding-top:90px;background:linear-gradient(transparent,rgba(11,61,59,.94) 40%)}
-.how-copy h2{font-size:26px}
+.how-copy{grid-column:1;padding:0 12px max(14px,env(safe-area-inset-bottom,0px))}
+.glass{max-width:none;padding:18px 16px 14px;border-radius:22px}
+.eyebrow{display:none}
+.how-copy h2{margin-top:0;font-size:22px}
+.prog{margin-top:12px}
 .how:not(.static) .steps li:not(.on){display:none}
 .how:not(.static) .steps::before{display:none}
-.how:not(.static) .steps{margin-top:14px}
+.how:not(.static) .steps{margin-top:10px}
+.how .steps li{padding:8px 10px}
+.hint{margin-top:10px;padding-top:10px}
 .how{height:520vh}
 }
 
@@ -227,14 +267,13 @@ html{scroll-padding-top:88px}
 .pill button{flex:none;width:48px;height:48px;border-radius:50%;border:0;background:var(--orange);color:#1F2937;cursor:pointer;display:grid;place-items:center}
 #loop-note{margin:12px 0 0;font-size:14px;color:rgba(255,255,255,.8);min-height:1.4em}
 #loop-note a{color:var(--cyan)}
-.fbar{margin-top:56px;border-top:1px solid rgba(255,255,255,.14);padding:32px 0 18px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px 24px;color:rgba(255,255,255,.75);font-size:15px}
+.fbar{margin-top:56px;border-top:1px solid rgba(255,255,255,.14);padding:32px 0 calc(28px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px 24px;color:rgba(255,255,255,.75);font-size:15px}
 .fbar a{justify-self:end;color:rgba(255,255,255,.75);text-decoration:none}
 .fbar a:hover{color:#fff;text-decoration:underline;text-underline-offset:4px}
 .pdyn{display:inline-flex;align-items:center;gap:12px;color:#fff;text-align:left}
 .pdyn svg{flex:none;border-radius:10px}
 .pdyn b{display:block;font-size:30px;line-height:.9;font-weight:800;letter-spacing:.01em}
 .pdyn small{display:block;margin-top:5px;font-size:10px;line-height:1;font-weight:600;letter-spacing:.42em;text-transform:uppercase}
-.fnote{padding:0 0 calc(28px + env(safe-area-inset-bottom,0px));text-align:center;color:rgba(255,255,255,.55);font-size:13px}
 @media(max-width:700px){.fbar{grid-template-columns:1fr;justify-items:center;text-align:center}.fbar a{justify-self:center}.pdyn{order:-1}}
 @media(max-width:900px){.fgrid{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){.fgrid{grid-template-columns:1fr}}

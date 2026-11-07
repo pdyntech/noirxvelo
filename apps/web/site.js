@@ -114,9 +114,13 @@ function scene(){
     .to([c1.position,c2.position],{y:'+=3',duration:.8},5).to([c1.scale,c2.scale],{x:.001,y:.001,z:.001,duration:.8},5.1)
     .to(esc.scale,{x:.01,y:.01,z:.01,duration:.8},5)
     .to(cam.position,{x:3,y:7,z:19,duration:1},5).to(look,{x:5,y:1,duration:1},5);
-  function mark(n){steps.forEach(function(s,i){s.classList.toggle('on',i===n)})}
+  var num=document.getElementById('how-n');
+  function mark(n){steps.forEach(function(s,i){s.classList.toggle('on',i===n)});how.style.setProperty('--step',n+1);if(num)num.textContent=n+1}
   mark(0);
-  function size(){var w=cv.clientWidth,h=cv.clientHeight;if(!w||!h)return;R.setSize(w,h,false);cam.aspect=w/h;cam.fov=w/h<.8?72:55;cam.updateProjectionMatrix()}
+  function size(){var w=cv.clientWidth,h=cv.clientHeight;if(!w||!h)return;R.setSize(w,h,false);cam.aspect=w/h;cam.fov=w/h<.8?72:55;
+    /* The canvas spans the whole section; on wide screens shift the view right so the ship sits beside the glass panel. */
+    var dx=matchMedia('(min-width:861px)').matches?how.querySelector('.how-copy').offsetWidth/2:0;
+    if(dx)cam.setViewOffset(w,h,-dx,0,w,h);else cam.clearViewOffset();cam.updateProjectionMatrix()}
   size();new ResizeObserver(size).observe(cv);
   var vis=true;ScrollTrigger.create({trigger:how,start:'top bottom',end:'bottom top',onToggle:function(s){vis=s.isActive}});
   gsap.ticker.add(function(t){
