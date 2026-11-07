@@ -26,17 +26,13 @@
   <img alt="Frontend build step" src="https://img.shields.io/badge/Frontend_Build_Step-None-8E44AD?style=flat-square&labelColor=1E1E1E">
 </p>
 
-<p align="center">
-  <b>Live website:</b> <a href="https://noirxvelo.vercel.app">noirxvelo.vercel.app</a> ·
-  <b>Demo video (2 min):</b> <a href="https://drive.google.com/file/d/1Cr3ncFfuCpBHOgGlcBWTrQGCC-COpCrC/view?usp=share_link">Watch on Google Drive</a> ·
-  <b>Pitch deck:</b> <a href="https://drive.google.com/file/d/1oCUmO3Og3WVbIg9tBZ6OpIl-SqDwVyF2/view?usp=sharing">View on Google Drive</a>
-</p>
+**Live website:** https://noirxvelo.vercel.app
 
-<p align="center">
-  <b>Team:</b> Helena (<a href="https://github.com/helenaherrero515">@helenaherrero515</a>, Discord TODO) ·
-  Ethan (<a href="https://github.com/thanreiz">@thanreiz</a>, Discord TODO) ·
-  Dia Aviles (<a href="https://github.com/krstndiane">@krstndiane</a>, Discord TODO)
-</p>
+**Demo video (2 min):** https://drive.google.com/file/d/1Cr3ncFfuCpBHOgGlcBWTrQGCC-COpCrC/view?usp=share_link
+
+**Pitch deck:** https://drive.google.com/file/d/1oCUmO3Og3WVbIg9tBZ6OpIl-SqDwVyF2/view?usp=sharing
+
+**Team:** Helena ([@helenaherrero515](https://github.com/helenaherrero515), Discord TODO), Ethan ([@thanreiz](https://github.com/thanreiz), Discord TODO), Dia Aviles ([@krstndiane](https://github.com/krstndiane), Discord TODO)
 
 <p align="center">
   <a href="#problem">Problem</a> ·
