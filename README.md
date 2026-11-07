@@ -26,13 +26,21 @@
   <img alt="Frontend build step" src="https://img.shields.io/badge/Frontend_Build_Step-None-8E44AD?style=flat-square&labelColor=1E1E1E">
 </p>
 
-**Live website:** https://noirxvelo.vercel.app
+<p align="center">
+  <a href="https://noirxvelo.vercel.app"><img alt="Live website" src="https://img.shields.io/badge/Live_Website-noirxvelo.vercel.app-0F766E?style=for-the-badge&logo=vercel&logoColor=white"></a>
+  <a href="https://drive.google.com/file/d/1Cr3ncFfuCpBHOgGlcBWTrQGCC-COpCrC/view?usp=share_link"><img alt="Demo video" src="https://img.shields.io/badge/Demo_Video-2_min-C0392B?style=for-the-badge&logo=googledrive&logoColor=white"></a>
+  <a href="https://drive.google.com/file/d/1oCUmO3Og3WVbIg9tBZ6OpIl-SqDwVyF2/view?usp=sharing"><img alt="Pitch deck" src="https://img.shields.io/badge/Pitch_Deck-Slides-F2730A?style=for-the-badge&logo=googledrive&logoColor=white"></a>
+</p>
 
-**Demo video (2 min):** https://drive.google.com/file/d/1Cr3ncFfuCpBHOgGlcBWTrQGCC-COpCrC/view?usp=share_link
+<div align="center">
 
-**Pitch deck:** https://drive.google.com/file/d/1oCUmO3Og3WVbIg9tBZ6OpIl-SqDwVyF2/view?usp=sharing
+| Team | GitHub | Discord |
+| :--- | :--- | :--- |
+| Helena | [@helenaherrero515](https://github.com/helenaherrero515) | TODO |
+| Ethan | [@thanreiz](https://github.com/thanreiz) | TODO |
+| Dia Aviles | [@krstndiane](https://github.com/krstndiane) | TODO |
 
-**Team:** Helena ([@helenaherrero515](https://github.com/helenaherrero515), Discord TODO), Ethan ([@thanreiz](https://github.com/thanreiz), Discord TODO), Dia Aviles ([@krstndiane](https://github.com/krstndiane), Discord TODO)
+</div>
 
 <p align="center">
   <a href="#problem">Problem</a> ·
@@ -67,7 +75,7 @@ Philippine inter-island shipping lines pay for bunker fuel, port dues and crew *
 - **The cargo owner pays through a normal Velo checkout.** A verified Velo webhook triggers settlement: the agent repays the investor, returns the reserve to the shipowner and takes a 0.5% fee.
 - **The agent can't overspend.** Every payout passes through Noir's `agent_registry`, which enforces a per-payment cap, asset and expiry.
 
-The site has two parts: a **live Testnet demo** at `/app` that runs the full loop on real Noir contracts, and a **role portal** where shipowners, investors and cargo owners sign up, tokenize, fund and pay invoices on one shared ledger (portal escrow is simulated and labelled as such).
+The site has two parts: a **live Testnet demo** at `/app` that runs the full loop on real Noir contracts, and a **role portal** where shipowners, investors and cargo owners sign up, tokenize, fund and pay invoices on one shared ledger. Portal invoices also run on Stellar Testnet: each shipowner and investor gets a Testnet wallet, and the same agent and Noir contracts register, fund, advance and settle them (sample invoices for new accounts stay simulated and are labelled).
 
 | Step | From → To | Demo ₱ | XLM |
 | :-- | :-- | --: | --: |
@@ -368,7 +376,7 @@ npm run lifecycle         # full Noir lifecycle on Testnet, prints Stellar Exper
 npm run default-demo      # default + recovery on Testnet
 ```
 
-**Deploy:** Render or Railway (a long-running process) gives the most reliable demo. Vercel also works (`vercel.json` is included), but accounts and demo state reset when the function restarts. Start command `npm start`, Node 24. Point `DATA_DIR` at a persistent disk, or accounts reset on each deploy. Then set the Velo webhook URL to `https://<your-host>/api/webhooks/velo`. Health check: `GET /api/health`. See [`apps/server/README.md`](apps/server/README.md).
+**Deploy:** Vercel (`vercel.json` is included) with a Redis store: add **Upstash** from the Vercel Marketplace (Storage tab), which sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`. Accounts, portal invoices and the demo run are then shared by every instance and survive restarts. Render or Railway also work: start command `npm start`, Node 24, and point `DATA_DIR` at a persistent disk (or add the same Redis variables). Then set the Velo webhook URL to `https://<your-host>/api/webhooks/velo`. Health check: `GET /api/health`. See [`apps/server/README.md`](apps/server/README.md).
 
 ---
 
@@ -387,6 +395,9 @@ npm run default-demo      # default + recovery on Testnet
 | `NODE_ENV` | `production` hides development email links in the UI | Hosting provider |
 | `TRUST_PROXY` | `1` trusts `X-Forwarded-For` (on by default in production) | Optional |
 | `PORTAL_VOYAGE_MS` | Portal voyage length, default `20000` | Optional |
+| `KV_REST_API_URL`, `KV_REST_API_TOKEN` (or `UPSTASH_REDIS_REST_*`, or `REDIS_URL`) | Shared Redis store for accounts, portal invoices and the demo run. Required on Vercel | Upstash via the Vercel Marketplace |
+| `WALLET_ENCRYPTION_KEY` | Encrypts the portal's custodial Testnet wallet keys. Defaults to a key derived from `TREASURY_SECRET`: keep that secret unchanged, or existing portal wallets can't be unlocked | Optional |
+| `PORTAL_ONCHAIN` | `0` runs new portal invoices in memory (simulated) instead of on Stellar Testnet | Optional |
 | `PORT` | Server port, default `3000` | Optional |
 | `DEMO_TICK_MS` | AIS tick interval, default `1800` | Optional |
 | `SIM_LATENCY_MS` | Fake network delay in simulation mode, default `450` | Optional |
