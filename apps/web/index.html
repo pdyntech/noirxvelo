@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="/landing.css">
+<link rel="stylesheet" href="/premium.css">
 <script>try{if(sessionStorage.getItem("sailo_in"))document.documentElement.classList.add("in")}catch(e){}</script>
 </head>
 <body>
@@ -48,8 +49,7 @@
       <div class="hb"><div class="proof">
         <div><strong>85%</strong><small>advanced at departure</small></div>
         <div><strong>0 XLM</strong><small>fees for shippers</small></div>
-        <div><strong>3.53%</strong><small>investor return over 60 days*</small></div>
-        <p class="fine">*Illustrative return on an 85% advance. Returns are not guaranteed.</p>
+        <div><strong>3.53%</strong><small>investor return over 60 days</small></div>
       </div></div>
     </div>
   </div>
@@ -59,7 +59,7 @@
 
 <main>
 <section class="sec" id="about"><div class="wrap">
-  <h2>Shipping lines pay for the voyage before they’re paid for it.</h2>
+  <p class="kick">Why Sailo</p><h2>Shipping lines pay for the voyage before they’re paid for it.</h2>
   <div class="costs">
     <div class="cost"><span class="ic"><i data-lucide="fuel" class="i"></i></span><div><h3>Fuel</h3><p>Cash before delivery.</p></div></div>
     <div class="cost"><span class="ic"><i data-lucide="anchor" class="i"></i></span><div><h3>Port charges</h3><p>Paid before you clear.</p></div></div>
@@ -82,7 +82,7 @@
 
 <section class="sec"><div class="wrap split">
   <div>
-    <h2>Every island route, tracked live.</h2>
+    <p class="kick">Coverage</p><h2>Every island route, tracked live.</h2>
     <ul class="lanes">
       <li data-r="mc"><span class="ic"><i data-lucide="ship" class="i"></i></span>Manila to Cebu</li>
       <li data-r="cc"><span class="ic"><i data-lucide="ship" class="i"></i></span>Cebu to Cagayan de Oro</li>
@@ -96,7 +96,7 @@
 
 <section class="sec band" id="numbers"><div class="wrap split">
   <div>
-    <h2>Every peso, accounted for.</h2>
+    <p class="kick">The numbers</p><h2>Every peso, accounted for.</h2>
     <p class="lede">Pick an invoice size to see how the money splits.</p>
     <div class="presets" id="presets" role="group" aria-label="Invoice size"></div>
     <p class="ret" id="ret" aria-live="polite"></p>
@@ -109,7 +109,7 @@
 </div></section>
 
 <section class="sec slate" id="guardrails"><div class="wrap">
-  <h2>An AI agent on a very short leash.</h2>
+  <p class="kick">Guardrails</p><h2>An AI agent on a very short leash.</h2>
   <div class="guard">
     <ul class="guards">
       <li><span class="ic"><i data-lucide="shield-check" class="i"></i></span>Capped payments</li>
@@ -132,7 +132,7 @@ nothing moved</pre>
 </div></section>
 
 <section class="sec" style="padding-bottom:0"><div class="wrap">
-  <h2>Everyone gets what they came for.</h2>
+  <p class="kick">Who it’s for</p><h2>Everyone gets what they came for.</h2>
   <div class="people">
     <div class="person"><span class="ic"><i data-lucide="ship" class="i"></i></span><span class="r">For shipowners</span><h3>Sail with cash.</h3></div>
     <div class="person"><span class="ic"><i data-lucide="trending-up" class="i"></i></span><span class="r">For investors</span><h3>Yield from real freight.</h3></div>
@@ -147,12 +147,12 @@ nothing moved</pre>
 </div></section>
 
 <section class="sec" id="risk"><div class="wrap">
-  <h2>Who carries the risk is settled before funding.</h2>
+  <p class="kick">Risk, disclosed</p><h2>Who carries the risk is settled before funding.</h2>
   <div class="tblw"><table class="tbl"><thead><tr><th>Risk</th><th>How it’s handled</th><th>Carried by</th><th>Status</th></tr></thead><tbody><tr><th scope="row">Cargo owner pays late, or not at all</th><td data-label="How it’s handled">Repayment can be delayed or lost. Investors hold through the outcome.</td><td class="mono" data-label="Carried by">Investor</td><td data-label="Status"><span class="chip s-risk">Disclosed</span></td></tr><tr><th scope="row">The AI agent tries to overspend</th><td data-label="How it’s handled">The payment is checked against its cap and rejected on-chain. Nothing moves.</td><td class="mono" data-label="Carried by">No one</td><td data-label="Status"><span class="chip s-ok">Enforced</span></td></tr><tr><th scope="row">An AIS signal is spoofed</th><td data-label="How it’s handled">Arrival signals can be faked, so payouts still depend on the cargo owner’s payment.</td><td class="mono" data-label="Carried by">Investor</td><td data-label="Status"><span class="chip s-risk">Disclosed</span></td></tr><tr><th scope="row">Regulatory licensing</th><td data-label="How it’s handled">SEC licensing is on our roadmap.</td><td class="mono" data-label="Carried by">Sailo</td><td data-label="Status"><span class="chip s-soon">Roadmap</span></td></tr></tbody></table></div>
   <p class="mono tnote">Returns are not guaranteed.</p>
 </div></section>
 <section class="sec" id="faq" style="padding-bottom:0"><div class="wrap split" style="align-items:start">
-  <h2>Questions, answered.</h2>
+  <p class="kick">FAQ</p><h2>Questions, answered.</h2>
   <div class="faq">
     <details><summary>How much do I get, and when?</summary><p>Sailo advances 85% of the invoice value at departure, so fuel, port charges and crew are covered before the vessel leaves.</p></details>
     <details><summary>What does it cost shipowners?</summary><p>There are no network fees for shippers. When the cargo owner pays, the investor is repaid their advance plus return, the protocol takes 0.5%, and whatever remains comes back to you as a rebate. The calculator above shows the exact split.</p></details>
@@ -165,7 +165,7 @@ nothing moved</pre>
   <div class="final">
     <img src="/assets/voyage.jpg" loading="lazy" alt="Container ships on the water at sunset">
     <div class="in">
-      <div><h2>Fueling VisMin’s trade, one voyage at a time.</h2><p class="lede" style="color:rgba(255,255,255,.88)">Tell us what you ship or want to fund. We’ll reply with next steps.</p></div>
+      <div><p class="kick">Get started</p><h2>Fueling VisMin’s trade, one voyage at a time.</h2><p class="lede" style="color:rgba(255,255,255,.88)">Tell us what you ship or want to fund. We’ll reply with next steps.</p></div>
       <form id="access-form" class="form" novalidate>
         <label>Name<input name="name" required autocomplete="name"></label>
         <label>Company<input name="company" autocomplete="organization"></label>
