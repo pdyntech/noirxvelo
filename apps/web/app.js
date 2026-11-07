@@ -230,7 +230,7 @@ function renderPipeline() {
   const html = STEPS.map((s, i) => {
     const sr = i + 1;
     const cls = sr <= r ? "done" : sr === r + 1 && st !== "SETTLED" && st !== "DEFAULT" ? "current" : "";
-    return `<div class="step ${cls}"${cls === "current" ? ' aria-current="step"' : ""}><div class="node"><div class="circle" aria-hidden="true">${sr <= r ? "✓" : sr}</div><div class="label">${s.replace("_", " ")}<span class="sr-only">${cls === "done" ? " (done)" : cls === "current" ? " (next)" : ""}</span></div></div><div class="bar" aria-hidden="true"></div></div>`;
+    return `<div class="step ${cls}"${cls === "current" ? ' aria-current="step"' : ""}><div class="node"><div class="circle" aria-hidden="true">${sr <= r ? "✓" : sr}</div><div class="label">${s.replace("_", " ").toLowerCase()}<span class="sr-only">${cls === "done" ? " (done)" : cls === "current" ? " (next)" : ""}</span></div></div><div class="bar" aria-hidden="true"></div></div>`;
   }).join("");
   const term = st === "HOLD" ? '<span class="terminal hold">HOLD</span>' : st === "DEFAULT" ? '<span class="terminal default">DEFAULT · recovered</span>' : "";
   $("#pipeline").innerHTML = html + term;
@@ -345,9 +345,21 @@ function opsPanel() {
   </div>`;
 }
 
+const ROLE_INTRO = {
+  shipowner: ["⚓", "You're the shipowner", "Get 85% of your freight invoice the day the ship sails, and the rest when the cargo owner pays."],
+  investor: ["◆", "You're the investor", "Fund a verified freight invoice and earn about 3% in 60 days. The agent repays you first."],
+  debtor: ["₱", "You're the cargo owner", "Pay the freight invoice in pesos once the cargo arrives. No crypto wallet needed."],
+  ops: ["◎", "You're running operations", "See every party at once, watch the agent's checks, and step in if something goes wrong."],
+};
+
+function roleIntro() {
+  const [icon, title, text] = ROLE_INTRO[role];
+  return `<div class="role-intro"><span class="ri-icon" aria-hidden="true">${icon}</span><div><b>${esc(title)}</b><p>${esc(text)}</p></div></div>`;
+}
+
 function renderRolePanel() {
   const map = { shipowner: [shipownerPanel], investor: [investorPanel], debtor: [debtorPanel], ops: [opsPanel, shipownerPanel, investorPanel, debtorPanel] };
-  $("#role-panel").innerHTML = map[role].map((f) => f()).join("");
+  $("#role-panel").innerHTML = roleIntro() + map[role].map((f) => f()).join("");
   document.querySelectorAll("#roles button").forEach((b) => {
     const on = b.dataset.role === role;
     b.setAttribute("aria-selected", String(on));
@@ -395,19 +407,11 @@ function chartSvg() {
   const berthed = v.berthed;
   return `
   <svg viewBox="0 0 ${BOX.w} ${BOX.h}" role="img" aria-label="Voyage chart Manila to Cebu">
-    <style>
-      .g{stroke:#0f3b3a;stroke-width:1}.gt{fill:#5f8f8b;font:10px ui-monospace,monospace}
-      .land{fill:#123f3b;stroke:#1f5a54;stroke-width:1}
-      .route{fill:none;stroke:#3c7b78;stroke-width:2;stroke-dasharray:5 6}
-      .done{fill:none;stroke:#4cc9dc;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
-      .port{fill:#f47b00}.pl{fill:#ffffff;font:600 11px "Plus Jakarta Sans",system-ui,sans-serif}.ps{fill:#a7c4c1;font:10px "Plus Jakarta Sans",system-ui,sans-serif}
-      .fence{fill:${berthed ? "rgba(52,211,153,.18)" : "rgba(96,165,250,.08)"};stroke:${berthed ? "#34d399" : "#3b6fb0"};stroke-width:1.5;stroke-dasharray:${berthed ? "0" : "3 3"}}
-    </style>
     ${grid.join("")}
     ${land}
     <polyline points="${ptsStr(ROUTE)}" class="route"/>
     ${done.length > 1 ? `<polyline points="${ptsStr(done)}" class="done"/>` : ""}
-    <circle cx="${cx}" cy="${cy}" r="${Math.max(rPx, 15)}" class="fence"/>
+    <circle cx="${cx}" cy="${cy}" r="${Math.max(rPx, 15)}" class="fence${berthed ? " on" : ""}"/>
     <circle cx="${px(14.58, 120.965)[0]}" cy="${px(14.58, 120.965)[1]}" r="4.5" class="port"/>
     <text x="${px(14.58, 120.965)[0] + 8}" y="${px(14.58, 120.965)[1] + 4}" class="pl">Manila South Harbor</text>
     <circle cx="${cx}" cy="${cy}" r="4.5" class="port"/>
@@ -416,8 +420,8 @@ function chartSvg() {
     <text x="${px(12.75, 122.25)[0]}" y="${px(12.75, 122.25)[1]}" class="ps">Sibuyan Sea</text>
     <text x="${px(11.55, 123.3)[0]}" y="${px(11.55, 123.3)[1]}" class="ps">Visayan Sea</text>
     <g transform="translate(${ship[0].toFixed(1)},${ship[1].toFixed(1)}) rotate(${t ? t.cog : 200})">
-      <circle r="11" fill="rgba(244,123,0,.2)"><animate attributeName="r" values="9;14;9" dur="2s" repeatCount="indefinite"/></circle>
-      <path d="M0,-9 L5,6 L0,3 L-5,6 Z" fill="#f47b00" stroke="#1e1307" stroke-width="1"/>
+      <circle r="11" class="ship-halo"><animate attributeName="r" values="9;14;9" dur="2s" repeatCount="indefinite"/></circle>
+      <path d="M0,-9 L5,6 L0,3 L-5,6 Z" class="ship"/>
     </g>
   </svg>`;
 }
@@ -501,7 +505,7 @@ function renderDecisions() {
     .map((d, i) => {
       const pills = d.payouts.map((p) => `<span class="pill ${esc(p.role)} ${d.decision === "REFUSED" ? "strike" : ""}">${esc(p.role)}: ${esc(p.xlm)} XLM</span>`).join("");
       const txs = d.txs.map((t) => `<div><span class="muted">${esc(t.step)} ${esc(t.role)}</span> · ${txLink(t)}</div>`).join("");
-      const refusal = d.refusal ? `<div class="small" style="margin-top:6px;color:${d.decision === "REFUSED" ? "#c4b5fd" : "var(--amber)"}">refusal: <b>${esc(d.refusal)}</b>${d.detail ? ` · ${esc(d.detail)}` : ""}</div>` : "";
+      const refusal = d.refusal ? `<div class="small refusal ${d.decision === "REFUSED" ? "REFUSED" : ""}">refusal: <b>${esc(d.refusal)}</b>${d.detail ? ` · ${esc(d.detail)}` : ""}</div>` : "";
       return `<article class="dec" data-dec="${esc(d.id)}" tabindex="0" aria-haspopup="dialog">
         <div class="dec-head"><span class="badge b-${esc(d.decision)}">${esc(d.decision)}</span>${d.requested !== d.decision ? `<span class="engine">requested ${esc(d.requested)}</span>` : ""}<span class="engine">${esc(d.engine)}</span><span class="dec-time">${esc(time(d.at))}</span></div>
         <div class="dec-reason">${esc(d.reason)}</div>
@@ -536,7 +540,7 @@ function renderOps() {
     isSim() ? button("mode/testnet", "Use Stellar Testnet", { enabled: S.config.canGoLive }) : button("mode/simulation", "Use simulation", {}),
   ];
   $("#ops-actions").innerHTML = actions.join("") + `<div class="small muted" style="width:100%;margin-top:4px">${isSim() ? "Simulation mode: contract calls run in memory." : "Every button makes real Testnet calls"} The simulated webhook delivery is HMAC-signed and verified by the same code path as a real Velo webhook.</div>`;
-  $("#ops-busy").innerHTML = S.busy ? `<span class="busy-pill"><span class="spin" style="width:10px;height:10px;border-width:2px;border-radius:50%;border-style:solid;border-right-color:transparent;display:inline-block;animation:spin .8s linear infinite"></span>${esc(S.busy)}…</span>` : S.voyage.running ? `<span class="busy-pill">voyage streaming…</span>` : "";
+  $("#ops-busy").innerHTML = S.busy ? `<span class="busy-pill"><span class="spin" aria-hidden="true"></span>${esc(S.busy)}…</span>` : S.voyage.running ? `<span class="busy-pill">voyage streaming…</span>` : "";
   const box = $("#ops-log");
   const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 30;
   box.innerHTML = (S.log || []).map((l) => `<div class="l-${esc(l.level)}"><span class="t">${esc(time(l.at))}</span> ${esc(l.text)}</div>`).join("");

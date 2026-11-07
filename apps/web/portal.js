@@ -130,7 +130,7 @@ function action(i){var m=i.m,s=i.state;
   SETTLED:role==='Investor'?'Settled. You received '+fmt(m.lp)+' ('+fmt(m.adv)+' plus '+fmt(m.lp-m.adv)+' yield).':role==='Cargo owner'?'Settled. Thank you for paying through Sailo.':'Settled. Every payee has been paid.'}[s]]}
 
 function detail(i){var m=i.m,a=action(i),k=si(i),who2=role==='Shipowner'?i.debtor:i.owner;
- var rws=[['Advance to shipowner',m.adv,'#0B3D3B'],['Repaid to investor',m.lp,'#4DD0E1'],['Rebate to shipowner',m.reb,'#F57C00'],['Protocol fee',m.fee,'#1F2937']];
+ var rws=[['Advance to shipowner',m.adv,'var(--teal)'],['Repaid to investor',m.lp,'var(--gb)'],['Rebate to shipowner',m.reb,'var(--orange)'],['Protocol fee',m.fee,'var(--mute)']];
  var h='<div class="card"><div class="dh"><div><h2>'+esc(i.vessel)+'</h2><p>'+esc(i.route)+' · '+esc(who2)+' · Net-'+i.term+(i.sample?' · Sample':'')+'</p></div><div class="fv">'+fmt(i.face)+'<small>'+xl(i.face)+' · '+esc(i.id)+'</small></div></div><ol class="trk">'+ST.map(function(s,x){return '<li class="'+(x<k?'d':x===k?'c':'')+'">'+LB[s]+'</li>'}).join('')+'</ol></div>';
  h+='<div class="card act"><p>'+a[0]+'</p>'+(a[1]?'<button class="btn" data-act="'+a[1]+'" data-id="'+esc(i.id)+'" type="button">'+a[2]+'</button>':'')+'</div>';
  if(k>=2&&k<=4&&i.state!=='HOLD')h+='<div class="card vy"><h3>Voyage</h3><div class="bar"><i style="width:'+i.prog+'%"></i></div><div class="ends"><span>Departed</span><span>'+esc(i.port)+'</span></div></div>';
@@ -151,7 +151,7 @@ function body(){var b=$('ap-body'),R=rows();
 
 function tabs(){$('ap-tabs').innerHTML=PG[role].map(function(p){return '<button type="button" data-p="'+p[0]+'"'+(p[0]===page?' aria-current="page"':'')+'>'+p[1]+'</button>'}).join('')}
 
-function draw(){$('ap-h').textContent=HD[page][0];$('ap-p').textContent=HD[page][1];$('ap-portal').textContent=role+' portal';tabs();
+function draw(){$('ap-h').textContent=HD[page][0];$('ap-p').textContent=HD[page][1];$('ap-portal').textContent=role+' portal';$('ap-kick').textContent=greet();tabs();
  var acct=page==='acct';$('ap-stats').hidden=acct;if(acct)account();else{stats();body()}
  $('ap-new').hidden=!(role==='Shipowner'&&page==='inv');banner()}
 
@@ -196,7 +196,10 @@ $('ap-form').addEventListener('submit',function(e){e.preventDefault();var fm=e.t
 });
 
 /* ---------------- account page ---------------- */
-function whoLabel(){$('ap-who').textContent=user.company?user.name+' · '+user.company:user.name}
+function whoLabel(){$('ap-who').textContent=user.company?user.name+' · '+user.company:user.name;
+ $('ap-av').textContent=String(user.name||'?').trim().split(/\s+/).slice(0,2).map(function(w){return w[0]}).join('').toUpperCase()}
+function greet(){var h=new Date().getHours(),n=user&&user.name?String(user.name).trim().split(/\s+/)[0]:'';
+ return (h<12?'Good morning':h<18?'Good afternoon':'Good evening')+(n?', '+n:'')}
 function account(){
  var u=user,v=u.emailVerified;
  $('ap-body').innerHTML='<div class="acct">'+

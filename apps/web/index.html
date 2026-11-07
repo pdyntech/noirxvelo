@@ -191,13 +191,15 @@ nothing moved</pre>
   <div class="fbar"><span>© 2026 Sailo. All rights reserved.</span><span class="pdyn" role="img" aria-label="PDYN Technologies"><svg viewBox="0 0 100 100" width="40" height="40" aria-hidden="true"><rect width="100" height="100" rx="22" fill="#fff"/><path d="M23 37 L44 63 L76 31 M52 30 H77 V55" fill="none" stroke="#071F1E" stroke-width="8" stroke-linecap="square" stroke-linejoin="miter"/></svg><span><b>PDYN</b><small>Technologies</small></span></span><a href="mailto:pdyntechnology@gmail.com">pdyntechnology@gmail.com</a></div>
 </div></footer>
 
-<div id="app"><header class="ap-top"><span class="ap-logo"><svg viewBox="0 0 120 100" width="30" height="25" aria-hidden="true"><path d="M50 4C48 26 36 50 8 66L50 66Z" fill="currentColor"/><path d="M57 12C70 30 78 46 80 62L57 62Z" fill="#F57C00"/><path d="M4 78C24 66 44 68 62 76 78 82 92 80 116 70 100 90 76 94 56 90 36 86 20 84 4 78Z" fill="currentColor"/><path d="M34 86C50 82 66 90 84 84 72 96 48 96 34 86Z" fill="#4DD0E1"/></svg>Sailo</span><span class="ap-portal" id="ap-portal"></span>
-<span class="ap-user"><span id="ap-who"></span><button id="ap-out" type="button">Sign out</button></span></header>
+<div id="app"><header class="ap-top"><div class="ap-bar">
+<span class="ap-logo"><svg viewBox="0 0 120 100" width="30" height="25" aria-hidden="true"><path d="M50 4C48 26 36 50 8 66L50 66Z" fill="currentColor"/><path d="M57 12C70 30 78 46 80 62L57 62Z" style="fill:var(--orange)"/><path d="M4 78C24 66 44 68 62 76 78 82 92 80 116 70 100 90 76 94 56 90 36 86 20 84 4 78Z" fill="currentColor"/><path d="M34 86C50 82 66 90 84 84 72 96 48 96 34 86Z" style="fill:var(--gb)"/></svg>Sailo</span><span class="ap-portal" id="ap-portal"></span>
 <nav class="ptabs" id="ap-tabs" aria-label="Portal pages"></nav>
+<span class="ap-user"><span class="ap-av" id="ap-av" aria-hidden="true"></span><span id="ap-who"></span><button id="ap-out" type="button">Sign out</button></span>
+</div></header>
 <main class="ap-main">
 <div id="ap-verify" class="vbanner" role="status" hidden></div>
-<div class="ap-head"><h1 id="ap-h"></h1><p id="ap-p"></p></div>
-<div class="stats" id="ap-stats"></div>
+<section class="ap-hero"><div class="ap-head"><p class="ap-kick" id="ap-kick"></p><h1 id="ap-h"></h1><p id="ap-p"></p></div>
+<div class="stats" id="ap-stats"></div></section>
 <details id="ap-new" class="newbox" hidden><summary>Tokenize an invoice</summary>
 <form id="ap-form" novalidate>
 <label>Vessel<input name="vessel" required placeholder="MV Example"></label>

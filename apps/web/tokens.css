@@ -1,32 +1,69 @@
-/* Sailo design tokens: the single source for the landing page (/) and the live demo (/app). */
+/* Sailo design tokens for the live dashboard (/app). Light theme: white surfaces, deep sea-green brand, orange action.
+   Every color in styles.css and app.js reads from here; change a value once and the whole dashboard follows. */
 :root {
   /* type */
   --sl-font: "Plus Jakarta Sans", "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --sl-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
-  /* surfaces: deep sea-teal, darkest first */
-  --sl-bg-0: #071b1a;
-  --sl-bg-1: #0a2422;
-  --sl-surface: #0e2d2b;
-  --sl-surface-2: #133a37;
-  --sl-surface-3: #1b4a45;
-  --sl-line: rgba(255, 255, 255, .10);
-  --sl-line-2: rgba(255, 255, 255, .20);
+  /* brand: deep sea-green (matches the landing page) */
+  --sl-brand: #0b3d3b;
+  --sl-brand-2: #12554f;
+  --sl-on-brand: #ffffff;
 
-  /* ink (all >= 4.5:1 on --sl-surface) */
-  --sl-ink: #ffffff;
-  --sl-ink-2: rgba(255, 255, 255, .84);
-  --sl-ink-3: rgba(255, 255, 255, .66);
+  /* surfaces: white first */
+  --sl-bg-0: #ffffff;
+  --sl-bg-1: #f5f9f7;
+  --sl-surface: #ffffff;
+  --sl-surface-2: #f1f6f4;
+  --sl-surface-3: #e4eeea;
+  --sl-line: #e3ebe7;
+  --sl-line-2: #cddbd5;
+  --sl-shadow: 0 1px 2px rgba(11, 61, 59, .06), 0 6px 20px -8px rgba(11, 61, 59, .14);
+  --sl-shadow-lg: 0 18px 50px -18px rgba(11, 61, 59, .32);
+  --sl-scrim: rgba(11, 61, 59, .38);
 
-  /* meaning: orange = primary action, cyan = live / info, green = confirmed money movement */
-  --sl-accent: #f47b00;
-  --sl-accent-h: #ff8c1a;
-  --sl-on-accent: #1e1307;
-  --sl-live: #4cc9dc;
-  --sl-ok: #3ddc97;
-  --sl-warn: #fbbf24;
-  --sl-bad: #f87171;
-  --sl-violet: #c4b5fd;
+  /* ink (all >= 4.5:1 on white) */
+  --sl-ink: #0b2b29;
+  --sl-ink-2: #2e4a47;
+  --sl-ink-3: #5a6e6b;
+
+  /* meaning: orange = primary action / attention, green = money moved / confirmed */
+  --sl-accent: #f57c00;
+  --sl-accent-h: #e56f00;
+  --sl-on-accent: #1f1300;
+  --sl-accent-ink: #b45309;
+  --sl-accent-soft: #fff3e6;
+  --sl-accent-line: #fbd2a6;
+
+  --sl-ok: #15803d;
+  --sl-ok-fill: #22a05a;
+  --sl-ok-soft: #e9f7ef;
+  --sl-ok-line: #b7e4c7;
+
+  --sl-live: #0e7490;
+  --sl-live-soft: #e6f5f8;
+  --sl-live-line: #b4e1ea;
+
+  --sl-warn: #b45309;
+  --sl-warn-soft: #fff7e6;
+  --sl-warn-line: #f6d38f;
+
+  --sl-bad: #b91c1c;
+  --sl-bad-soft: #fdeeee;
+  --sl-bad-line: #f5c2c2;
+
+  --sl-violet: #6d28d9;
+  --sl-violet-soft: #f3eefe;
+  --sl-violet-line: #d9c8fb;
+
+  /* voyage chart */
+  --sl-sea: #eaf5f4;
+  --sl-sea-2: #d8ece9;
+  --sl-land: #bcd9c4;
+  --sl-land-line: #8fb89c;
+  --sl-grid: #d3e6e2;
+  --sl-grid-text: #5a7d78;
+  --sl-route: #8fb5ae;
 
   /* shape */
   --sl-r-sm: 8px;
@@ -42,7 +79,7 @@
   --sl-5: 24px;
   --sl-6: 32px;
 
-  --sl-focus: #ffd2a3;
-  color-scheme: dark;
+  --sl-focus: #f57c00;
+  color-scheme: light;
 }
 .tnum, .mono, code { font-variant-numeric: tabular-nums; }
