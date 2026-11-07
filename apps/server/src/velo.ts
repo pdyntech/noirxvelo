@@ -128,7 +128,8 @@ export function signSimulatedDelivery(pi: { id: string; amount: string; asset: s
     type: "payment.succeeded",
     test: true,
     sentAt: now,
-    project: { name: "noirxvelo" },
+    // The Velo SDK validates the event shape: project needs id, registryProjectId, name and slug.
+    project: { id: "proj_sim_noirxvelo", registryProjectId: "sim", name: "noirxvelo", slug: "noirxvelo" },
     paymentIntent: { ...pi, status: "paid", merchantName: "VisMin Freight Factoring", createdAt: now, updatedAt: now },
   });
   const t = Math.floor(Date.now() / 1000);

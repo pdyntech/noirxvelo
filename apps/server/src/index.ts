@@ -8,6 +8,8 @@ import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
 import { PORT, WEB_DIR } from "./env.js";
 import * as demo from "./demo.js";
+import { readBody, send, toJson } from "./http.js";
+import { handleSite } from "./site.js";
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -23,30 +25,6 @@ const MIME: Record<string, string> = {
   ".json": "application/json",
   ".webmanifest": "application/manifest+json",
 };
-
-const toJson = (v: unknown) => JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? x.toString() : x));
-
-function send(res: ServerResponse, status: number, body: unknown): void {
-  const text = toJson(body);
-  res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
-  res.end(text);
-}
-
-function readBody(req: IncomingMessage, limit = 1_000_000): Promise<string> {
-  return new Promise((ok, fail) => {
-    let size = 0;
-    const chunks: Buffer[] = [];
-    req.on("data", (c: Buffer) => {
-      size += c.length;
-      if (size > limit) {
-        fail(new Error("body too large"));
-        req.destroy();
-      } else chunks.push(c);
-    });
-    req.on("end", () => ok(Buffer.concat(chunks).toString("utf8")));
-    req.on("error", fail);
-  });
-}
 
 /** Actions run in the background; the UI follows progress over the event stream. */
 const ACTIONS: Record<string, () => Promise<unknown>> = {
@@ -137,6 +115,7 @@ const server = createServer(async (req, res) => {
       return send(res, r.status, r.body);
     }
     if (req.method === "POST" && path in ACTIONS) return handleAction(path, res);
+    if (path.startsWith("/api/") && (await handleSite(req, res, path))) return;
     if (path.startsWith("/api/")) return send(res, 404, { ok: false, error: "not found" });
     if (req.method === "GET" || req.method === "HEAD") return serveStatic(path, res);
     send(res, 405, { ok: false, error: "method not allowed" });

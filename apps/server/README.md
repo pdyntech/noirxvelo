@@ -23,6 +23,24 @@ Press **▶ Run Demo** in the Ops panel. It runs the whole loop on Stellar Testn
 
 Every step is also a manual button in the Shipowner, Investor and Debtor views.
 
+## Website, accounts and portal
+
+`/` is the Sailo landing page (`apps/web/index.html`, `landing.css`, `site.js`, `portal.js`). `/app` is the live Testnet demo above.
+
+- **Accounts.** "Get started" creates a Shipowner, Investor or Cargo owner account. The full route list is at the top of `src/site.ts`; the rules live in `src/accounts.ts` and are tested in `src/accounts.test.ts`.
+  - Passwords are hashed with scrypt (per-user salt). Short, common or name/email passwords are refused.
+  - Sessions are a random token in an HttpOnly, SameSite=Lax cookie (Secure over HTTPS). Only a hash is stored. They last 30 days; the Account tab lists devices and can sign out the others.
+  - **Email verification:** sign-up emails a link (24 h). Tokenizing, funding and paying need a verified email.
+  - **Password reset:** "Forgot password?" emails a one-time link (30 min). Resetting signs out every other device. The answer is the same whether or not the email has an account.
+  - **Change password and profile** in the Account tab. Changing the password signs out other devices.
+  - Rate limits on sign-in (account locks for 15 min after 10 failures), sign-up, resend and reset.
+  - **Email delivery:** set `SMTP_URL` and `MAIL_FROM`. Without them, emails go to the server log, and outside production the link is also shown in the UI, labelled as a development link. A production deploy without `SMTP_URL` can't send links, so it doesn't require verification and logs a warning. Set `APP_URL` in production so links always point at your domain.
+- **Portal.** One shared ledger, so the roles meet: a shipowner tokenizes an invoice (`POST /api/portal/invoices`), any investor funds it from the Marketplace (`.../:id/fund`), the agent checks and releases the 85% advance, the voyage runs, and the cargo owner named by email pays after berthing (`.../:id/pay`). The agent then settles. If no cargo owner email is given, payment is simulated after berthing. Amounts use the same integer payout math as the Testnet demo. Escrow and transfers in the portal are simulated and labelled as such.
+- **Sample data.** Each new account gets a few private sample invoices whose missing counterparty is simulated, so the portal is never empty.
+- **Forms.** The enquiry form (`POST /api/enquiry`) and newsletter (`POST /api/subscribe`) are saved on the server.
+
+Everything is stored in `apps/server/data/sailo.json` (git-ignored). Set `DATA_DIR` to a persistent disk on Render or Railway, or accounts reset on each deploy. `PORTAL_VOYAGE_MS` (default 20000) sets how long a portal voyage takes.
+
 ## Environment
 
 | Name | Needed | What it does |

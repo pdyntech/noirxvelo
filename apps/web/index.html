@@ -1,152 +1,260 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Sailo · Freight advances for island shipping lines</title>
-  <meta name="description" content="Sailo advances 85% of a freight invoice the day the ship sails. An AI settlement agent pays within on-chain limits it cannot exceed. Built on Stellar with Noir and Velo." />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 56'%3E%3Cpath d='M27 2 L27 40 L6 40 Z' fill='%23fff'/%3E%3Cpath d='M31 9 L44 40 L31 40 Z' fill='%23f47b00'/%3E%3Cpath d='M2 45 C18 54 44 54 62 42 C48 48 26 49 2 45 Z' fill='%23fff'/%3E%3C/svg%3E" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
-  <link rel="stylesheet" href="/tokens.css" />
-  <link rel="stylesheet" href="/landing.css" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sailo: Freight advances for island shipping lines</title>
+<meta name="description" content="Sailo advances 85% of a freight invoice the day your vessel sails, with every payment capped and enforced on-chain. Built for Visayas and Mindanao shipping lines.">
+<meta name="theme-color" content="#0B3D3B">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 100'%3E%3Cpath d='M50 4C48 26 36 50 8 66L50 66Z' fill='%230B3D3B'/%3E%3Cpath d='M57 12C70 30 78 46 80 62L57 62Z' fill='%23F57C00'/%3E%3Cpath d='M4 78C24 66 44 68 62 76 78 82 92 80 116 70 100 90 76 94 56 90 36 86 20 84 4 78Z' fill='%230B3D3B'/%3E%3Cpath d='M34 86C50 82 66 90 84 84 72 96 48 96 34 86Z' fill='%234DD0E1'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="/landing.css">
+<script>try{if(sessionStorage.getItem("sailo_in"))document.documentElement.classList.add("in")}catch(e){}</script>
 </head>
 <body>
-  <a class="skip" href="#about">Skip to content</a>
-  <header class="hero" id="top">
-    <nav class="nav" aria-label="Main">
-      <div class="nav-links">
-        <a href="#about">About</a>
-        <a href="#how">How it works</a>
-        <a href="#numbers">Numbers</a>
-        <a href="#guardrails">Guardrails</a>
-        <a href="#proof">Proof</a>
+<nav class="nav" aria-label="Sections">
+  <a class="logo" href="#top">
+        <svg viewBox="0 0 120 100" width="38" height="32" role="img" aria-label="Sailo logo"><path d="M50 4C48 26 36 50 8 66L50 66Z" fill="#fff"/><path d="M57 12C70 30 78 46 80 62L57 62Z" fill="#F57C00"/><path d="M4 78C24 66 44 68 62 76 78 82 92 80 116 70 100 90 76 94 56 90 36 86 20 84 4 78Z" fill="#fff"/><path d="M34 86C50 82 66 90 84 84 72 96 48 96 34 86Z" fill="#4DD0E1"/></svg>Sailo
+      </a>
+  <div class="links" id="nav-links"><a class="l" href="#about">About</a><a class="l" href="#how">How it works</a><a class="l" href="#numbers">Numbers</a><a class="l" href="#guardrails">Guardrails</a><a class="l" href="/app">Live demo</a><a class="l only-sm" href="#signin" data-auth="signin">Sign in</a></div>
+  <div class="navr"><a class="l signin" href="#signin" data-auth="signin">Sign in</a><a class="btn" href="#get-started" data-auth="signup">Get started</a><button class="menu-btn" type="button" aria-expanded="false" aria-controls="nav-links" aria-label="Open menu"><i data-lucide="menu" class="i"></i></button></div>
+</nav>
+<div class="page">
+<header class="hero" id="top">
+  <img src="/assets/hero.jpg" fetchpriority="high" alt="Aerial view of a container port with orange cranes at sunset">
+  <div class="wrap">
+    
+    <div class="hero-body">
+      <div class="hc"><h1><span><b><svg class="mark" viewBox="0 0 120 100" aria-hidden="true"><path d="M50 4C48 26 36 50 8 66L50 66Z" fill="#fff"/><path d="M57 12C70 30 78 46 80 62L57 62Z" fill="#F57C00"/><path d="M4 78C24 66 44 68 62 76 78 82 92 80 116 70 100 90 76 94 56 90 36 86 20 84 4 78Z" fill="#fff"/><path d="M34 86C50 82 66 90 84 84 72 96 48 96 34 86Z" fill="#4DD0E1"/></svg>Sailo</b></span></h1>
+        <p class="sub">Freight advances for island shipping lines, guarded by an AI that <mark>can’t overspend</mark>.</p>
+        <div class="cta-row">
+        <a class="btn" href="#get-started" data-auth="signup">Get started <i data-lucide="arrow-right" class="i" style="width:20px;height:20px"></i></a>
+        <a class="btn ghost" href="#how">How it works</a>
       </div>
-      <a class="btn btn-orange nav-cta" href="/app">Open live demo</a>
-    </nav>
-
-    <div class="wrap hero-body">
-      <h1 class="lockup" aria-label="Sailo">
-        <svg class="mark" viewBox="0 0 250 200" aria-hidden="true">
-          <path d="M101 0 L101 135 L10 135 Z" fill="#fff" />
-          <path d="M117 22 L168 128 L117 128 Z" fill="#f47b00" />
-          <path d="M0 160 C58 205 168 210 248 140 C196 172 116 184 0 160 Z" fill="#fff" />
-          <path d="M68 178 C110 194 152 192 182 178 C150 186 110 186 68 178 Z" fill="#4cc9dc" />
-        </svg>
-        <span class="word">Sailo</span>
-      </h1>
-
-      <p class="tagline">Freight advances for island shipping lines, guarded by an AI that can’t overspend.</p>
-
-      <div class="cta-row">
-        <a class="btn btn-orange btn-lg" href="/app">Run the live demo <span aria-hidden="true">→</span></a>
-        <a class="btn btn-ghost btn-lg" href="#how">How it works</a>
       </div>
-
-      <dl class="stats">
-        <div class="stat stat-hl"><dt>₱850,000</dt><dd>advanced on a ₱1,000,000 invoice</dd></div>
-        <div class="stat"><dt>85%</dt><dd>advanced at departure</dd></div>
-        <div class="stat"><dt>0 XLM</dt><dd>fees for shippers</dd></div>
-        <div class="stat"><dt>3.53%</dt><dd>investor return over 60 days*</dd></div>
-      </dl>
-      <p class="footnote">*Illustrative return on an 85% advance. Returns are not guaranteed.</p>
+      <aside class="inv" aria-label="Example freight invoice">
+        <div class="inv-top"><span class="mono">Freight invoice</span><span class="chip ok">Advance released</span></div>
+        <p class="inv-route">Manila to Cebu</p>
+        <dl>
+          <div><dt>Shipowner</dt><dd>Example Shipping Co.</dd></div>
+          <div><dt>Invoice value</dt><dd class="mono">₱1,000,000</dd></div>
+          <div><dt>Advanced at departure, 85%</dt><dd class="mono big" id="count">₱850,000</dd></div>
+          <div><dt>Cargo owner pays</dt><dd>60 days after delivery</dd></div>
+        </dl>
+        <p class="inv-note mono">Example invoice, for illustration.</p>
+      </aside>
+      <div class="hb"><div class="proof">
+        <div><strong>85%</strong><small>advanced at departure</small></div>
+        <div><strong>0 XLM</strong><small>fees for shippers</small></div>
+        <div><strong>3.53%</strong><small>investor return over 60 days*</small></div>
+        <p class="fine">*Illustrative return on an 85% advance. Returns are not guaranteed.</p>
+      </div></div>
     </div>
-  </header>
-
-  <main>
-    <section class="section" id="about">
-      <div class="wrap two-col">
-        <div>
-          <p class="eyebrow">About</p>
-          <h2>Ships sail on cash. Freight gets paid in 60 days.</h2>
-        </div>
-        <div class="prose">
-          <p>Inter-island shipping lines pay for bunker fuel, port dues and crew before they leave port. The cargo owners they carry for pay on Net-60 to Net-90 terms. Small operators fill that gap with slow bank lines or expensive informal loans.</p>
-          <p>Sailo turns a freight invoice into an on-chain escrow. An investor funds 85% of it, and the shipowner has the money the day the vessel sails. When the cargo owner pays through a normal Velo checkout, an AI settlement agent repays the investor and returns the reserve.</p>
-        </div>
-      </div>
-    </section>
-
-    <section class="section alt" id="how">
-      <div class="wrap">
-        <p class="eyebrow">How it works</p>
-        <h2>Four steps, one agent, every payment on Stellar.</h2>
-        <ol class="steps">
-          <li><span class="n">1</span><h3>Tokenize the waybill</h3><p>The invoice hash is registered on Noir’s <code>device_registry</code>, and the agent gets a spending policy in <code>agent_registry</code>: per-payment cap, asset and expiry.</p></li>
-          <li><span class="n">2</span><h3>Advance at departure</h3><p>An investor funds the escrow. When AIS shows the vessel underway, the agent releases the 85% advance to the shipowner.</p></li>
-          <li><span class="n">3</span><h3>Prove delivery</h3><p>Inside the Cebu port geofence at ≤0.5 knots for three readings, the agent signs a proof-of-delivery attestation.</p></li>
-          <li><span class="n">4</span><h3>Settle on payment</h3><p>The cargo owner pays via Velo checkout. After a verified webhook, the agent repays the investor, rebates the shipowner and takes the fee.</p></li>
-        </ol>
-      </div>
-    </section>
-
-    <section class="section" id="numbers">
-      <div class="wrap">
-        <p class="eyebrow">Numbers</p>
-        <h2>A ₱1,000,000 invoice, settled to the last stroop.</h2>
-        <div class="flow">
-          <div class="flow-item"><span class="k">Advance to shipowner</span><span class="v">₱850,000</span><span class="s">85%, the day the ship sails</span></div>
-          <div class="flow-item"><span class="k">Investor repayment</span><span class="v">₱880,000</span><span class="s">principal + 3% of face</span></div>
-          <div class="flow-item"><span class="k">Reserve rebate</span><span class="v">₱115,000</span><span class="s">back to the shipowner</span></div>
-          <div class="flow-item"><span class="k">Protocol fee</span><span class="v">₱5,000</span><span class="s">0.5% of face</span></div>
-        </div>
-        <p class="note">Integer accounting: repayment + rebate + fee always equals the invoice. Testnet demo amounts at a fixed rate of 1 XLM = ₱1,000.</p>
-      </div>
-    </section>
-
-    <section class="section alt" id="guardrails">
-      <div class="wrap two-col">
-        <div>
-          <p class="eyebrow">Guardrails</p>
-          <h2>The agent decides. The chain sets the limits.</h2>
-        </div>
-        <ul class="checks">
-          <li><b>Capped on-chain.</b> Every payment is checked by Noir’s <code>agent_registry</code>. A single payout above the cap is refused before any fee is paid.</li>
-          <li><b>Roles, not addresses.</b> The agent names who gets paid (shipowner, investor, treasury). Code maps roles to stored wallets and recomputes every amount.</li>
-          <li><b>Two gates to settle.</b> A verified Velo webhook for the exact invoice amount, plus a signed berthing attestation.</li>
-          <li><b>Fail closed.</b> Any mismatch becomes a HOLD. On default, ops revokes the agent and sweeps the escrow back to treasury.</li>
-        </ul>
-      </div>
-    </section>
+  </div>
+</header>
+<div class="ticker" role="marquee" aria-label="Highlights"><div class="tk"><span>85% advanced at departure</span><span>0 XLM network fees for shippers</span><span>Every payment capped on-chain</span><span>Built on Stellar</span><span>Arrival confirmed by AIS</span><span>Escrow back to zero at settlement</span><span class="dupe" aria-hidden="true"></span><span aria-hidden="true">85% advanced at departure</span><span aria-hidden="true">0 XLM network fees for shippers</span><span aria-hidden="true">Every payment capped on-chain</span><span aria-hidden="true">Built on Stellar</span><span aria-hidden="true">Arrival confirmed by AIS</span><span aria-hidden="true">Escrow back to zero at settlement</span></div></div>
 
 
-    <section class="section" id="proof">
-      <div class="wrap two-col">
-        <div>
-          <p class="eyebrow">Proof</p>
-          <h2>Real transactions on Stellar Testnet.</h2>
-          <p class="note">Recorded 6 Nov 2026 by the team's lifecycle and default scripts through the same agent code the demo uses. Open any hash on Stellar Expert.</p>
-        </div>
-        <div>
-          <ul class="proof">
-            <li><span>Invoice registered (device_registry)</span><a href="https://stellar.expert/explorer/testnet/tx/9ba6b79cf1b1732d2583f583f2cb7c2674fddf1badb8bc2f6dff2f044ec97c5f" target="_blank" rel="noopener"><code>9ba6b79c…7c5f</code> ↗</a></li>
-            <li><span>Agent policy, 880 XLM cap</span><a href="https://stellar.expert/explorer/testnet/tx/9bde02602a5a3f4b55f967339d1953133d366b403452647f7d1bb801c5614faa" target="_blank" rel="noopener"><code>9bde0260…4faa</code> ↗</a></li>
-            <li><span>Investor funds 850 XLM escrow</span><a href="https://stellar.expert/explorer/testnet/tx/3d546679502258b0e8e8d63ff023cca458aeb3a6270142527b233a653e249dd7" target="_blank" rel="noopener"><code>3d546679…9dd7</code> ↗</a></li>
-            <li><span>Agent authorizes 850 XLM advance</span><a href="https://stellar.expert/explorer/testnet/tx/d8899a5bff111ea3a82daa4b421100f88a8589d10c506197aadf5700e2b82385" target="_blank" rel="noopener"><code>d8899a5b…2385</code> ↗</a></li>
-            <li><span>Shipowner claims the advance</span><a href="https://stellar.expert/explorer/testnet/tx/0c540e3762d646d2eb84bd1bdfd377f4229c0be974cce5c7d66c8b77989a392c" target="_blank" rel="noopener"><code>0c540e37…392c</code> ↗</a></li>
-            <li><span>Default: agent revoked, escrow swept</span><a href="https://stellar.expert/explorer/testnet/tx/eb14b8b43ad44912e29afe9a29de69d23845183a52f389737bef4f6982578d6d" target="_blank" rel="noopener"><code>eb14b8b4…8d6d</code> ↗</a></li>
-          </ul>
-          <dl class="realsim">
-            <div><dt>Real</dt><dd>Noir contracts on Stellar Testnet, every escrow, authorize and claim, the per-payment cap, and the HMAC check on Velo webhooks.</dd></div>
-            <div><dt>Simulated</dt><dd>The vessel's AIS positions, the fixed 1 XLM = ₱1,000 rate, and the debtor's payment when no Velo API key is set. The demo can also run its contracts in memory if Testnet is down, and labels that clearly.</dd></div>
-          </dl>
-        </div>
-      </div>
-    </section>
-    <section class="section cta-band">
-      <div class="wrap cta-inner">
-        <h2>Watch a full voyage settle, in about 90 seconds.</h2>
-        <a class="btn btn-orange btn-lg" href="/app">Open the live demo <span aria-hidden="true">→</span></a>
-      </div>
-    </section>
-  </main>
+<main>
+<section class="sec" id="about"><div class="wrap">
+  <h2>Shipping lines pay for the voyage before they’re paid for it.</h2>
+  <div class="costs">
+    <div class="cost"><span class="ic"><i data-lucide="fuel" class="i"></i></span><div><h3>Fuel</h3><p>Cash before delivery.</p></div></div>
+    <div class="cost"><span class="ic"><i data-lucide="anchor" class="i"></i></span><div><h3>Port charges</h3><p>Paid before you clear.</p></div></div>
+    <div class="cost"><span class="ic"><i data-lucide="users" class="i"></i></span><div><h3>Crew</h3><p>Payroll will not wait.</p></div></div>
+  </div>
+  <div class="race">
+    <div><h3>Without Sailo</h3><div class="track"><i class="wait"></i></div><small><span>Day 0</span><span>60 days waiting for payment</span><span>Day 60</span></small></div>
+    <div><h3>With Sailo</h3><div class="track"><i class="got"></i></div><small><span>Day 0: ₱850,000 in hand</span><span>Day 60</span></small></div>
+  </div>
+</div></section>
 
-  <footer class="foot">
-    <div class="wrap foot-inner">
-      <span>Sailo · Testnet prototype for the Velo × Noir Agentic Payment Hackathon</span>
-      <span>Fictional shipper, vessel and debtor. Not financial advice.</span>
+<section class="how" id="how"><div class="pin"><canvas id="gl" role="img" aria-label="3D scene of a cargo ship that loads, sails and berths as you scroll"></canvas><div class="how-copy"><h2>Six steps from one invoice to settled.</h2><ol class="steps">
+    <li><span class="ic"><i data-lucide="package" class="i"></i></span><h3>1. Tokenize</h3><p>Hash the e-Waybill on-chain.</p></li>
+    <li><span class="ic"><i data-lucide="wallet" class="i"></i></span><h3>2. Fund</h3><p>An investor backs 85%.</p></li>
+    <li><span class="ic"><i data-lucide="zap" class="i"></i></span><h3>3. Advance</h3><p>The agent pays at departure.</p></li>
+    <li><span class="ic"><i data-lucide="map-pin" class="i"></i></span><h3>4. Berth</h3><p>Arrival confirmed by AIS.</p></li>
+    <li><span class="ic"><i data-lucide="credit-card" class="i"></i></span><h3>5. Pay</h3><p>The cargo owner checks out.</p></li>
+    <li><span class="ic"><i data-lucide="scale" class="i"></i></span><h3>6. Settle</h3><p>Everyone paid. Escrow at zero.</p></li>
+  </ol><p class="hint">Keep scrolling to sail the ship.</p></div></div></section>
+
+<section class="sec"><div class="wrap split">
+  <div>
+    <h2>Every island route, tracked live.</h2>
+    <ul class="lanes">
+      <li><span class="ic"><i data-lucide="map-pin" class="i"></i></span>Manila to Cebu</li>
+      <li><span class="ic"><i data-lucide="map-pin" class="i"></i></span>Cebu to Cagayan de Oro</li>
+      <li><span class="ic"><i data-lucide="map-pin" class="i"></i></span>Manila to Davao</li>
+    </ul>
+  </div>
+  <div class="map">
+    <svg viewBox="0 0 900 460" role="img" aria-label="Stylised map of shipping routes between Manila, Cebu, Cagayan de Oro and Davao">
+      <defs><pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.2" fill="#1D5E5B"/></pattern></defs>
+      <rect width="900" height="460" fill="#0B3D3B"/><rect width="900" height="460" fill="url(#dots)"/>
+      <path d="M160 50Q230 30 270 80 300 130 250 170 200 190 170 140 140 90 160 50Z" fill="#14504D"/>
+      <path d="M420 200Q500 170 560 210 600 250 550 290 490 310 440 280 400 240 420 200Z" fill="#14504D"/>
+      <path d="M580 300Q690 270 760 330 800 400 720 430 630 440 590 380 560 340 580 300Z" fill="#14504D"/>
+      <path class="dash" d="M250 100Q340 200 510 250" fill="none" stroke="#F57C00" stroke-width="3" stroke-linecap="round"/>
+      <path class="dash" d="M510 250Q570 270 610 340" fill="none" stroke="#4DD0E1" stroke-width="3" stroke-linecap="round"/>
+      <path class="dash" d="M250 100C450 90 700 200 750 390" fill="none" stroke="#FAF7F0" stroke-width="3" stroke-linecap="round"/>
+      <circle r="6" fill="#F57C00"><animateMotion dur="6s" repeatCount="indefinite" path="M250 100Q340 200 510 250"/></circle>
+      <circle r="6" fill="#4DD0E1"><animateMotion dur="4s" repeatCount="indefinite" path="M510 250Q570 270 610 340"/></circle>
+      <circle r="6" fill="#FAF7F0"><animateMotion dur="9s" repeatCount="indefinite" path="M250 100C450 90 700 200 750 390"/></circle>
+      <g fill="#fff"><circle cx="250" cy="100" r="7" fill="#F57C00"/><circle cx="510" cy="250" r="7" fill="#4DD0E1"/><circle cx="610" cy="340" r="7" fill="#4DD0E1"/><circle cx="750" cy="390" r="7"/></g>
+      <g fill="#fff" font-family="Plus Jakarta Sans,sans-serif" font-size="18" font-weight="700"><text x="270" y="86">Manila</text><text x="470" y="232">Cebu</text><text x="400" y="372">Cagayan de Oro</text><text x="705" y="424">Davao</text></g>
+      <text x="24" y="440" fill="#9CC3BF" font-family="Plus Jakarta Sans,sans-serif" font-size="12">Stylised map, not to scale</text>
+    </svg>
+  </div>
+</div></section>
+
+<section class="sec band" id="numbers"><div class="wrap split">
+  <div>
+    <h2>Every peso, accounted for.</h2>
+    <p class="lede">Pick an invoice size to see how the money splits.</p>
+    <div class="presets" id="presets" role="group" aria-label="Invoice size"></div>
+    <p class="ret" id="ret" aria-live="polite"></p>
+  </div>
+  <div class="ledger">
+    <div class="top"><span>Invoice</span><b id="face"></b></div>
+    <div id="rows" style="display:grid;gap:20px"></div>
+    <div class="sum"><span>Always adds up exactly</span><b id="sum"></b></div>
+  </div>
+</div></section>
+
+<section class="sec slate" id="guardrails"><div class="wrap">
+  <h2>An AI agent on a very short leash.</h2>
+  <div class="guard">
+    <ul class="guards">
+      <li><span class="ic"><i data-lucide="shield-check" class="i"></i></span>Capped payments</li>
+      <li><span class="ic"><i data-lucide="lock" class="i"></i></span>Roles, not wallets</li>
+      <li><span class="ic"><i data-lucide="cpu" class="i"></i></span>AI explains, code pays</li>
+      <li><span class="ic"><i data-lucide="alert-triangle" class="i"></i></span>Fails closed</li>
+    </ul>
+    <div class="term">
+      <div class="tag"><i></i>Over-limit payment, rejected on-chain</div>
+<pre>agent.authorize(
+  to:     shipowner,
+  amount: 1,000 XLM
+)
+
+<em>REVERTED: check_payment</em>
+amount exceeds cap of 880 XLM
+nothing moved</pre>
     </div>
-  </footer>
+  </div>
+</div></section>
+
+<section class="sec" style="padding-bottom:0"><div class="wrap">
+  <h2>Everyone gets what they came for.</h2>
+  <div class="people">
+    <div class="person"><span class="ic"><i data-lucide="ship" class="i"></i></span><span class="r">For shipowners</span><h3>Sail with cash.</h3></div>
+    <div class="person"><span class="ic"><i data-lucide="trending-up" class="i"></i></span><span class="r">For investors</span><h3>Yield from real freight.</h3></div>
+    <div class="person"><span class="ic"><i data-lucide="credit-card" class="i"></i></span><span class="r">For cargo owners</span><h3>Pay like any checkout.</h3></div>
+  </div>
+  <div class="stack">
+    <div><span class="ic"><i data-lucide="globe" class="i" style="width:22px;height:22px"></i></span><span><strong>Stellar</strong><small>Cheap, fast settlement</small></span></div>
+    <div><span class="ic"><i data-lucide="package" class="i" style="width:22px;height:22px"></i></span><span><strong>Noir contracts</strong><small>Rules enforced on-chain</small></span></div>
+    <div><span class="ic"><i data-lucide="zap" class="i" style="width:22px;height:22px"></i></span><span><strong>Velo</strong><small>Checkout and gasless calls</small></span></div>
+  </div>
+  
+</div></section>
+
+<section class="sec" id="risk"><div class="wrap">
+  <h2>Who carries the risk is settled before funding.</h2>
+  <div class="tblw"><table class="tbl"><thead><tr><th>Risk</th><th>How it’s handled</th><th>Carried by</th><th>Status</th></tr></thead><tbody><tr><th scope="row">Cargo owner pays late, or not at all</th><td data-label="How it’s handled">Repayment can be delayed or lost. Investors hold through the outcome.</td><td class="mono" data-label="Carried by">Investor</td><td data-label="Status"><span class="chip s-risk">Disclosed</span></td></tr><tr><th scope="row">The AI agent tries to overspend</th><td data-label="How it’s handled">The payment is checked against its cap and rejected on-chain. Nothing moves.</td><td class="mono" data-label="Carried by">No one</td><td data-label="Status"><span class="chip s-ok">Enforced</span></td></tr><tr><th scope="row">An AIS signal is spoofed</th><td data-label="How it’s handled">Arrival signals can be faked, so payouts still depend on the cargo owner’s payment.</td><td class="mono" data-label="Carried by">Investor</td><td data-label="Status"><span class="chip s-risk">Disclosed</span></td></tr><tr><th scope="row">Regulatory licensing</th><td data-label="How it’s handled">SEC licensing is on our roadmap.</td><td class="mono" data-label="Carried by">Sailo</td><td data-label="Status"><span class="chip s-soon">Roadmap</span></td></tr></tbody></table></div>
+  <p class="mono tnote">Returns are not guaranteed.</p>
+</div></section>
+<section class="sec" id="faq" style="padding-bottom:0"><div class="wrap split" style="align-items:start">
+  <h2>Questions, answered.</h2>
+  <div class="faq">
+    <details><summary>How much do I get, and when?</summary><p>Sailo advances 85% of the invoice value at departure, so fuel, port charges and crew are covered before the vessel leaves.</p></details>
+    <details><summary>What does it cost shipowners?</summary><p>There are no network fees for shippers. When the cargo owner pays, the investor is repaid their advance plus return, the protocol takes 0.5%, and whatever remains comes back to you as a rebate. The calculator above shows the exact split.</p></details>
+    <details><summary>How is the AI agent kept in check?</summary><p>The agent explains and proposes. Code decides what actually moves: payments are capped, access is by role rather than wallet, and anything that fails a check is rejected on-chain with nothing moved.</p></details>
+    <details><summary>How do you confirm the cargo arrived?</summary><p>Arrival is confirmed from vessel AIS signals. AIS can be spoofed, which is why we list it as a risk and why payouts still depend on the cargo owner’s payment.</p></details>
+    <details><summary>What are the risks for investors?</summary><p>Investors carry default risk if a cargo owner does not pay. The 3.53% figure is an illustration for a 60-day invoice at an 85% advance, not a promise of return.</p></details>
+  </div>
+</div></section>
+<section style="padding-top:96px" id="access"><div class="wrap">
+  <div class="final">
+    <img src="/assets/voyage.jpg" loading="lazy" alt="Container ships on the water at sunset">
+    <div class="in">
+      <div><h2>Fueling VisMin’s trade, one voyage at a time.</h2><p class="lede" style="color:rgba(255,255,255,.88)">Tell us what you ship or want to fund. We’ll reply with next steps.</p></div>
+      <form id="access-form" class="form" novalidate>
+        <label>Name<input name="name" required autocomplete="name"></label>
+        <label>Company<input name="company" autocomplete="organization"></label>
+        <label>I am a<select name="role"><option>Shipowner</option><option>Investor</option><option>Cargo owner</option></select></label>
+        <label>Work email<input name="email" type="email" required autocomplete="email"></label>
+        <label class="wide">What do you ship, or want to fund?<textarea name="msg" rows="3"></textarea></label>
+        <button class="btn wide" type="submit">Send enquiry</button>
+        <p class="fine wide" id="form-note" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>
+</div></section>
+</main>
+</div>
+
+<footer class="site-foot"><div class="ff">
+  <div class="fgrid">
+    <div class="fb"><a class="flogo" href="#top"><svg viewBox="0 0 120 100" width="56" height="47" aria-hidden="true"><path d="M50 4C48 26 36 50 8 66L50 66Z" fill="#fff"/><path d="M57 12C70 30 78 46 80 62L57 62Z" fill="#F57C00"/><path d="M4 78C24 66 44 68 62 76 78 82 92 80 116 70 100 90 76 94 56 90 36 86 20 84 4 78Z" fill="#fff"/><path d="M34 86C50 82 66 90 84 84 72 96 48 96 34 86Z" fill="#4DD0E1"/></svg>Sailo</a><p>Move Freight. Unlock Capital.</p><div class="soc"><a href="https://www.instagram.com/pdyntech/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i data-lucide="instagram" class="i" style="width:20px;height:20px"></i></a><a href="https://www.facebook.com/profile.php?id=61595269470373" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><i data-lucide="facebook" class="i" style="width:20px;height:20px"></i></a></div></div>
+    <nav aria-label="Pages"><h3>Pages</h3><a href="#top">Home</a><a href="#about">About</a><a href="#how">How it works</a><a href="#numbers">Numbers</a><a href="#faq">FAQ</a><a href="/app">Live demo</a><a href="#get-started" data-auth="signup">Get started</a></nav>
+    <nav aria-label="Legal"><h3>Legal</h3><a href="#">Privacy Policy</a><a href="#">Terms of Service</a></nav>
+    <form id="loop" novalidate><h3>Stay in the loop</h3><div class="pill"><input type="email" name="email" placeholder="Your email" aria-label="Your email" autocomplete="email" required><button type="submit" aria-label="Subscribe"><i data-lucide="arrow-right" class="i" style="width:20px;height:20px"></i></button></div><p id="loop-note" role="status" aria-live="polite"></p></form>
+  </div>
+  <div class="fbar"><span>© 2026 Sailo. Built by PDynTech.</span><span>Not an offer to sell securities. Returns are not guaranteed.</span></div>
+</div></footer>
+
+<div id="app"><header class="ap-top"><span class="ap-logo"><svg viewBox="0 0 120 100" width="30" height="25" aria-hidden="true"><path d="M50 4C48 26 36 50 8 66L50 66Z" fill="currentColor"/><path d="M57 12C70 30 78 46 80 62L57 62Z" fill="#F57C00"/><path d="M4 78C24 66 44 68 62 76 78 82 92 80 116 70 100 90 76 94 56 90 36 86 20 84 4 78Z" fill="currentColor"/><path d="M34 86C50 82 66 90 84 84 72 96 48 96 34 86Z" fill="#4DD0E1"/></svg>Sailo</span><span class="ap-portal" id="ap-portal"></span>
+<span class="ap-user"><span id="ap-who"></span><button id="ap-out" type="button">Sign out</button></span></header>
+<nav class="ptabs" id="ap-tabs" aria-label="Portal pages"></nav>
+<main class="ap-main">
+<div id="ap-verify" class="vbanner" role="status" hidden></div>
+<div class="ap-head"><h1 id="ap-h"></h1><p id="ap-p"></p></div>
+<div class="stats" id="ap-stats"></div>
+<details id="ap-new" class="newbox" hidden><summary>Tokenize an invoice</summary>
+<form id="ap-form" novalidate>
+<label>Vessel<input name="vessel" required placeholder="MV Example"></label>
+<label>Route<input name="route" required placeholder="Manila to Cebu"></label>
+<label>Cargo owner<input name="debtor" required placeholder="Company name"></label>
+<label><span>Cargo owner email <span class="opt">(optional)</span></span><input name="debtorEmail" type="email" placeholder="ap@cargo-owner.com" autocomplete="off"></label>
+<p class="hintx">With an email, that cargo owner pays from their own Sailo portal. Without one, payment is simulated after the vessel berths.</p>
+<label>Invoice value (₱)<input name="face" type="number" min="10000" step="1000" required inputmode="numeric"></label>
+<label>Payment terms<select name="term"><option value="30">Net-30</option><option value="45">Net-45</option><option value="60" selected>Net-60</option><option value="90">Net-90</option></select></label>
+<button class="btn" type="submit">Tokenize invoice</button><p id="ap-fnote" role="status"></p>
+</form></details>
+<p id="ap-err" class="ap-err" role="alert" hidden></p>
+<div id="ap-body"><div class="empty">Loading your portal…</div></div>
+<p class="ap-note">Amounts are shown at a fixed rate of 1 XLM = ₱1,000. Portal escrow and payments are simulated and labelled; <a href="/app">the live demo</a> runs the same flow on Stellar Testnet.</p>
+</main></div>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<dialog id="auth" aria-labelledby="auth-title"><div class="auth-card">
+<button class="auth-x" type="button" data-close aria-label="Close"><i data-lucide="x" class="i"></i></button>
+<span class="auth-logo"><svg viewBox="0 0 120 100" width="34" height="28" aria-hidden="true"><path d="M50 4C48 26 36 50 8 66L50 66Z" fill="currentColor"/><path d="M57 12C70 30 78 46 80 62L57 62Z" fill="#F57C00"/><path d="M4 78C24 66 44 68 62 76 78 82 92 80 116 70 100 90 76 94 56 90 36 86 20 84 4 78Z" fill="currentColor"/><path d="M34 86C50 82 66 90 84 84 72 96 48 96 34 86Z" fill="#4DD0E1"/></svg>Sailo</span>
+<h2 id="auth-title"></h2><p class="auth-sub" id="auth-sub"></p>
+<form id="auth-form" novalidate>
+<label data-modes="signup">Full name<input name="name" autocomplete="name" maxlength="120"></label>
+<label data-modes="signup"><span>Company <span class="opt">(optional)</span></span><input name="company" autocomplete="organization" maxlength="120"></label>
+<label data-modes="signup signin forgot">Work email<input name="email" type="email" autocomplete="email" placeholder="you@company.com" maxlength="200" autocapitalize="off" spellcheck="false"></label>
+<fieldset class="roles" data-modes="signup"><legend>I am a</legend>
+<label><input type="radio" name="role" value="Shipowner" checked><span>Shipowner</span></label>
+<label><input type="radio" name="role" value="Investor"><span>Investor</span></label>
+<label><input type="radio" name="role" value="Cargo owner"><span>Cargo owner</span></label></fieldset>
+<label data-modes="signup signin reset"><span id="pw-label">Password</span><span class="pw"><input name="password" type="password" minlength="8" maxlength="200" aria-describedby="pw-hint"><button type="button" class="eye" aria-label="Show password"><i data-lucide="eye" class="i"></i></button></span><small class="pw-hint" id="pw-hint" data-modes="signup reset">At least 8 characters. Avoid common passwords.</small></label>
+<label data-modes="reset">Confirm new password<input name="confirm" type="password" minlength="8" maxlength="200" autocomplete="new-password"></label>
+<button type="button" class="forgot" data-mode="forgot" data-modes="signin">Forgot password?</button>
+<button class="btn" type="submit" id="auth-submit"></button>
+<p id="auth-note" role="status" aria-live="polite"></p>
+<p class="auth-switch" id="auth-switch"></p>
+</form></div></dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.460.0/dist/umd/lucide.min.js" defer></script>
+<script src="/site.js" defer></script>
+<script src="/portal.js" defer></script>
 </body>
 </html>
