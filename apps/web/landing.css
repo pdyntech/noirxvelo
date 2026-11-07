@@ -227,7 +227,15 @@ html{scroll-padding-top:88px}
 .pill button{flex:none;width:48px;height:48px;border-radius:50%;border:0;background:var(--orange);color:#1F2937;cursor:pointer;display:grid;place-items:center}
 #loop-note{margin:12px 0 0;font-size:14px;color:rgba(255,255,255,.8);min-height:1.4em}
 #loop-note a{color:var(--cyan)}
-.fbar{margin-top:56px;border-top:1px solid rgba(255,255,255,.14);padding:22px 0 calc(28px + env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 24px;color:rgba(255,255,255,.75);font-size:15px}
+.fbar{margin-top:56px;border-top:1px solid rgba(255,255,255,.14);padding:32px 0 18px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px 24px;color:rgba(255,255,255,.75);font-size:15px}
+.fbar a{justify-self:end;color:rgba(255,255,255,.75);text-decoration:none}
+.fbar a:hover{color:#fff;text-decoration:underline;text-underline-offset:4px}
+.pdyn{display:inline-flex;align-items:center;gap:12px;color:#fff;text-align:left}
+.pdyn svg{flex:none;border-radius:10px}
+.pdyn b{display:block;font-size:30px;line-height:.9;font-weight:800;letter-spacing:.01em}
+.pdyn small{display:block;margin-top:5px;font-size:10px;line-height:1;font-weight:600;letter-spacing:.42em;text-transform:uppercase}
+.fnote{padding:0 0 calc(28px + env(safe-area-inset-bottom,0px));text-align:center;color:rgba(255,255,255,.55);font-size:13px}
+@media(max-width:700px){.fbar{grid-template-columns:1fr;justify-items:center;text-align:center}.fbar a{justify-self:center}.pdyn{order:-1}}
 @media(max-width:900px){.fgrid{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){.fgrid{grid-template-columns:1fr}}
 
