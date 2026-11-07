@@ -392,10 +392,13 @@ npm run default-demo      # default + recovery on Testnet
 
 ## Screenshots
 
-| Landing page | Live Testnet demo, settled |
-| :-: | :-: |
-| <img src="docs/screenshots/landing.jpg" alt="Sailo landing page" width="420"> | <img src="docs/screenshots/demo-settled.jpg" alt="Live demo after settlement: escrow 0 XLM, guardrail refused over_limit, agent decisions" width="420"> |
-| Hero, invoice card and headline numbers | All stages done, escrow 0 XLM, guardrail refusal (`over_limit`), agent decisions with Stellar Expert links |
+**Landing page:** hero, invoice card and headline numbers.
+
+![Sailo landing page](docs/screenshots/landing.jpg)
+
+**Live Testnet demo, settled:** all stages done, escrow 0 XLM, guardrail refusal (`over_limit`), and agent decisions with Stellar Expert links.
+
+![Live demo after settlement](docs/screenshots/demo-settled.jpg)
 
 ---
 
