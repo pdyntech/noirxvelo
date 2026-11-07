@@ -341,8 +341,8 @@ noirxvelo/
 **You need:** Node **24.22.1** (see `.nvmrc`; older Node silently installs the retired agent-sdk 0.2.0) and internet access to Stellar Testnet. No wallet extension is needed: `provision` creates and funds Testnet wallets with Friendbot.
 
 ```bash
-git clone https://github.com/krstndiane/noirxvelo.git
-cd noirxvelo
+git clone https://github.com/pdyntech/sailo.git
+cd sailo
 nvm use                   # Node 24.22.1
 npm install               # one install at the repo root (workspaces)
 npm run provision         # once: creates + funds Testnet wallets into .env.local
