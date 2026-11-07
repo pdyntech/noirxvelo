@@ -236,7 +236,7 @@ Related code: the executor's [`execute`](packages/agent/src/executor.ts#L200), t
 | :-- | :-- |
 | Debtor checkout session (`velo.checkout.sessions.create`, asset `native`, idempotency key per invoice) | [`createCheckout`, velo.ts#L42](apps/server/src/velo.ts#L42) |
 | Signed webhook verification (`Velo.webhooks.verify`, raw body, 300 s tolerance) | [`verifyWebhook`, velo.ts#L99](apps/server/src/velo.ts#L99) |
-| Webhook route `POST /api/webhooks/velo` | [index.ts#L110](apps/server/src/index.ts#L110) |
+| Webhook route `POST /api/webhooks/velo` | [app.ts#L109](apps/server/src/app.ts#L109) |
 | De-dupe by `x-velo-delivery`, match amount to the invoice, then treasury funds escrow | [`receiveWebhook`, demo.ts#L570](apps/server/src/demo.ts#L570) |
 
 Without `VELO_API_KEY`, checkout is simulated and **labelled as simulated** in the UI. Without `VELO_WEBHOOK_SECRET`, only self-signed simulated deliveries pass verification.
@@ -304,7 +304,9 @@ noirxvelo/
 ├── apps/
 │   ├── server/                 # One Node process: API, Velo webhook, agent runtime, static frontend
 │   │   └── src/
-│   │       ├── index.ts        # HTTP routes, SSE stream, /api/webhooks/velo
+│   │       ├── index.ts        # Long-running server entry (npm start)
+│   │       ├── app.ts          # HTTP routes, SSE stream, /api/webhooks/velo
+│   │       ├── vercel.ts       # Vercel function entry (same handler)
 │   │       ├── demo.ts         # Invoice state machine and Run Demo loop
 │   │       ├── agent.ts        # Decision policy (roles only) + optional LLM reason
 │   │       ├── telemetry.ts    # AIS simulator and Cebu berthing rule
@@ -382,6 +384,9 @@ npm run default-demo      # default + recovery on Testnet
 | `PORTAL_VOYAGE_MS` | Portal voyage length, default `20000` | Optional |
 | `PORT` | Server port, default `3000` | Optional |
 | `DEMO_TICK_MS` | AIS tick interval, default `1800` | Optional |
+| `SIM_LATENCY_MS` | Fake network delay in simulation mode, default `450` | Optional |
+| `NOIRXVELO_DATA_FILE` | File for the demo invoice store; empty keeps it in memory | Optional |
+| `LIVE` | `1` runs the live Testnet tests in `npm test` | Optional, tests only |
 | `SIMULATE_CHAIN` | `1` runs the contracts in memory, labelled "simulated". Turns on automatically when wallet keys are missing | Optional |
 
 ---
