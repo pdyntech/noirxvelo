@@ -27,28 +27,30 @@
 </p>
 
 <p align="center">
-  <b>Live website:</b> <a href="#">TODO: deployed URL</a> ·
-  <b>Demo video (2 min):</b> <a href="#">TODO</a> ·
-  <b>Pitch deck:</b> <a href="#">TODO</a>
+  <b>Live website:</b> <a href="https://noirxvelo.vercel.app">noirxvelo.vercel.app</a> ·
+  <b>Demo video (2 min):</b> <a href="https://drive.google.com/file/d/1Cr3ncFfuCpBHOgGlcBWTrQGCC-COpCrC/view?usp=share_link">Watch on Google Drive</a> ·
+  <b>Pitch deck:</b> <a href="https://drive.google.com/file/d/1oCUmO3Og3WVbIg9tBZ6OpIl-SqDwVyF2/view?usp=sharing">View on Google Drive</a>
 </p>
 
 <p align="center">
   <b>Team:</b> Helena (<a href="https://github.com/helenaherrero515">@helenaherrero515</a>, Discord TODO) ·
   Ethan (<a href="https://github.com/thanreiz">@thanreiz</a>, Discord TODO) ·
-  Dia Aviles (GitHub TODO, Discord TODO)
+  Dia Aviles (<a href="https://github.com/krstndiane">@krstndiane</a>, Discord TODO)
 </p>
 
 <p align="center">
   <a href="#problem">Problem</a> ·
   <a href="#solution">Solution</a> ·
-  <a href="#voyage-stages">Voyage Stages</a> ·
   <a href="#how-the-agentic-payment-works">Agentic Payment</a> ·
   <a href="#architecture">Architecture</a> ·
   <a href="#noir-integration">Noir</a> ·
   <a href="#velo-integration">Velo</a> ·
   <a href="#testnet-proof">Testnet Proof</a> ·
+  <a href="#repo-structure">Repo</a> ·
   <a href="#run-it-locally">Run It</a> ·
-  <a href="#faq">FAQ</a>
+  <a href="#environment-variables">Env</a> ·
+  <a href="#whats-next">What's Next</a> ·
+  <a href="#credits">Credits</a>
 </p>
 
 ---
@@ -85,21 +87,6 @@ Testnet demo amounts at a fixed rate of **1 XLM = ₱1,000**. The investor deplo
 
 ---
 
-## Voyage Stages
-
-| Stage | Trigger | Who acts | On-chain effect |
-| :-- | :-- | :-- | :-- |
-| **1. Tokenized** | Shipowner submits the waybill | Treasury | `registerDevice` + `registerAgent` (cap 880 XLM) |
-| **2. Funded** | Investor commits capital | LP | `fundEscrow` 850 XLM |
-| **3. Advanced** | First AIS "underway" tick | 🤖 Agent decides **ADVANCE** | `authorizePayment` 850 → shipowner, then `claim` |
-| **4. Berthed** | Inside 800 m Cebu geofence at ≤ 0.5 kn for 3 ticks | 🤖 Agent signs attestation | Off-chain proof of delivery |
-| **5. Paid** | Verified Velo `payment.succeeded` webhook | Treasury | `fundEscrow` 1,000 XLM |
-| **🛑 Guardrail** | Agent tries a single 1,000 XLM payout | Noir refuses | `checkPayment` → `over_limit`, no tx, no fee |
-| **6. Settled** | Both settle gates pass | 🤖 Agent decides **SETTLE** | 3× `authorizePayment` (LP 880, shipowner 115, treasury 5), each payee claims, escrow = 0 |
-| **⚠️ Default** | Due date + grace passed, no payment | Ops | `unlinkDevice` (revoke agent + sweep escrow to treasury) |
-
----
-
 ## How the agentic payment works
 
 The settlement agent decides **when**, **whom** and **how much**. Code checks everything it proposes before any money moves.
@@ -132,6 +119,47 @@ flowchart TD
     J --> K["Escrow balance = 0"]
     E -- "Due date + grace passed" --> L["⚠️ DEFAULT → revoke agent, sweep to treasury"]
 ```
+
+### Voyage stages
+
+| Stage | Trigger | Who acts | On-chain effect |
+| :-- | :-- | :-- | :-- |
+| **1. Tokenized** | Shipowner submits the waybill | Treasury | `registerDevice` + `registerAgent` (cap 880 XLM) |
+| **2. Funded** | Investor commits capital | LP | `fundEscrow` 850 XLM |
+| **3. Advanced** | First AIS "underway" tick | 🤖 Agent decides **ADVANCE** | `authorizePayment` 850 → shipowner, then `claim` |
+| **4. Berthed** | Inside 800 m Cebu geofence at ≤ 0.5 kn for 3 ticks | 🤖 Agent signs attestation | Off-chain proof of delivery |
+| **5. Paid** | Verified Velo `payment.succeeded` webhook | Treasury | `fundEscrow` 1,000 XLM |
+| **🛑 Guardrail** | Agent tries a single 1,000 XLM payout | Noir refuses | `checkPayment` → `over_limit`, no tx, no fee |
+| **6. Settled** | Both settle gates pass | 🤖 Agent decides **SETTLE** | 3× `authorizePayment` (LP 880, shipowner 115, treasury 5), each payee claims, escrow = 0 |
+| **⚠️ Default** | Due date + grace passed, no payment | Ops | `unlinkDevice` (revoke agent + sweep escrow to treasury) |
+
+### Guardrails and compliance
+
+- **Capped on-chain.** Every payment is checked by Noir's `agent_registry`. A single payout above the cap is refused before any fee is paid.
+- **Roles, not addresses.** The agent names who gets paid. Code maps roles to stored wallets and recomputes every amount, so the model can never pay an arbitrary wallet or see a secret.
+- **Two gates to settle.** A verified Velo webhook for the exact invoice amount, plus a signed berthing attestation.
+- **No double payouts.** One payment in flight per agent, and webhooks are de-duplicated by delivery ID before any side effect.
+- **No double pledging.** A second `registerDevice` for the same waybill hash is rejected on-chain (spike S3).
+- **Fail closed.** Any mismatch becomes a `HOLD`. On default, ops revokes the agent and sweeps the escrow back to treasury.
+- **Clear about what's simulated.** Real: Noir contracts on Testnet, every escrow, authorize and claim, the per-payment cap and the Velo webhook HMAC check. Simulated: AIS vessel positions, the fixed 1 XLM = ₱1,000 rate, and the debtor payment when no Velo key is set.
+- **Testnet prototype.** Factoring is regulated in the Philippines, and invoice-backed products for investors may count as securities. Shipper, vessel and debtor are fictional. Not financial advice.
+
+### FAQ
+
+**Why does the agent need a cap if code already checks the amounts?**
+Defense in depth. If the agent key leaks or the code has a bug, Noir's `agent_registry` still refuses any single payment above 880 XLM, before a fee is paid.
+
+**Can the AI send money to its own wallet?**
+No. The model only names roles (`SHIPOWNER`, `LP`, `TREASURY`). Code maps those to stored addresses and recomputes every amount. A mismatch becomes a `HOLD`.
+
+**What if the ship anchors offshore near Cebu?**
+It doesn't count. Berthing requires being inside the 800 m geofence **and** at ≤ 0.5 knots for three readings in a row.
+
+**What if the cargo owner never pays?**
+After the due date plus grace, ops triggers `DEFAULT`: the agent is revoked and the escrow is swept back to treasury. In this MVP the investor bears the loss, and the UI says so.
+
+**What if Testnet is down during the demo?**
+The server can switch to an in-memory version of the contracts. Every screen labels it "simulated".
 
 ---
 
@@ -221,9 +249,30 @@ Without `VELO_API_KEY`, checkout is simulated and **labelled as simulated** in t
 
 ## Testnet proof
 
-Recorded 6 Nov 2026 by [`scripts/lifecycle.ts`](scripts/lifecycle.ts) and [`scripts/default-demo.ts`](scripts/default-demo.ts) through the same agent code the demo uses. Full details are in [`docs/testnet-proof.md`](docs/testnet-proof.md).
+Every transaction below was made on Stellar Testnet through the Noir SDK by the same agent code the demo uses. The settle run was recorded 7 Nov 2026; the lifecycle and default runs on 6 Nov 2026 by [`scripts/lifecycle.ts`](scripts/lifecycle.ts) and [`scripts/default-demo.ts`](scripts/default-demo.ts). Full details are in [`docs/testnet-proof.md`](docs/testnet-proof.md).
 
-**Happy path (register → fund → advance → claim)**
+**Full loop, end to end (register → fund → advance → Velo payment → settle → claims)**
+
+Recorded 7 Nov 2026 with **▶ Run Demo** (`POST /api/run-demo`) in Testnet mode, using the same code as the live site. Agent wallet: [`GAP6Z…P5YV`](https://stellar.expert/explorer/testnet/account/GAP6ZDGBGPJMOYRJONXAEH5J334U5V3TR74LXRSDCWEY6NZY5ZLIP5YV).
+
+| Step | Transaction |
+| :-- | :-- |
+| Invoice registered (`device_registry`) | [056d4274…aca2](https://stellar.expert/explorer/testnet/tx/056d4274e62c7f8bd9063c1506d7da5aa23509d0ca327150adbb10fd16a5aca2) |
+| Agent policy, 880 XLM cap (`agent_registry`) | [d0dcb52b…5728](https://stellar.expert/explorer/testnet/tx/d0dcb52beb3df2bbfef044f376ff4a00bd3828fc533f4392f9526072a4255728) |
+| Investor funds 850 XLM escrow | [e3bac447…3bdc](https://stellar.expert/explorer/testnet/tx/e3bac44782f0eb3845b57cef39ed9db1a0f056d1dc3cfad88dca012ba64f3bdc) |
+| **🤖 Agent ADVANCE: authorizes 850 XLM → shipowner** | [8b8384d7…995c](https://stellar.expert/explorer/testnet/tx/8b8384d7a8e2212777a400b09fb55c70e1b176d7d67eb8fd4f9fc720cafd995c) |
+| Shipowner claims the advance | [84962bc6…901c](https://stellar.expert/explorer/testnet/tx/84962bc6cf735326adfc28e7eb11e25d87bb0ad78580b12b9a5599cfda7c901c) |
+| Treasury funds 1,000 XLM after the verified Velo webhook | [99d907da…a4f2](https://stellar.expert/explorer/testnet/tx/99d907dae85d80736f306b467d7b882cb5f527db78a47c3178db93a11214a4f2) |
+| **🤖 Agent SETTLE: authorizes 880 XLM → investor** | [d2d0c38b…388f](https://stellar.expert/explorer/testnet/tx/d2d0c38b2f482af4cb25bc3b4df14dec4a932cfb198ff4a7cfec268d4869388f) |
+| **🤖 Agent SETTLE: authorizes 115 XLM → shipowner** | [08d9f63b…91c5](https://stellar.expert/explorer/testnet/tx/08d9f63ba0430198e7281a9ada1960fb134f9aa630e64187208e8a641a4891c5) |
+| **🤖 Agent SETTLE: authorizes 5 XLM → treasury** | [83177fb2…b773](https://stellar.expert/explorer/testnet/tx/83177fb2a9b0fc91eee8ff20f07e33a479e29c7b2d64ee944f22d6893ac4b773) |
+| Investor claims | [2ecab943…fe00](https://stellar.expert/explorer/testnet/tx/2ecab94382baec3341199fa999122e7b465210fcf615493fbc4a9e76dc69fe00) |
+| Shipowner claims | [6ace8dae…5de1](https://stellar.expert/explorer/testnet/tx/6ace8dae1716ff357b9a38a40f86b9d20a7a72fb3dab80917789605115d35de1) |
+| Treasury claims | [de6a987b…f3a6](https://stellar.expert/explorer/testnet/tx/de6a987b74c94853d2ce393d2a0922717d88f1d3735daa5dfb67101b2bccf3a6) |
+
+After the claims, `balanceOf(invoice)` is `0`. In the same run, the agent's 1,000 XLM over-cap payout was refused by `checkPayment` with `over_limit` (contract error `AgentNotAuthorized #3`), with no transaction sent and no fee paid.
+
+**Earlier lifecycle run (register → fund → advance → claim)**
 
 | Step | Transaction |
 | :-- | :-- |
@@ -249,8 +298,6 @@ After the claim, the escrow balance is `0` and the shipowner is up +849.9989932 
 Escrow went from 850 to 0, and treasury was up +849.9978111 XLM. After revoke, `checkPayment` returns `no_agent` and the wrapper refuses to send.
 
 **Guardrail:** an over-cap payout is refused by `checkPayment` with `over_limit` before any transaction or fee (spike S8 in [`docs/spikes.md`](docs/spikes.md)).
-
-<!-- TODO: add SETTLE (3× authorize + claims) tx links from a full live demo run -->
 
 ---
 
@@ -298,7 +345,7 @@ noirxvelo/
 **You need:** Node **24.22.1** (see `.nvmrc`; older Node silently installs the retired agent-sdk 0.2.0) and internet access to Stellar Testnet. No wallet extension is needed: `provision` creates and funds Testnet wallets with Friendbot.
 
 ```bash
-git clone https://github.com/pdyntech/noirxvelo.git
+git clone https://github.com/krstndiane/noirxvelo.git
 cd noirxvelo
 nvm use                   # Node 24.22.1
 npm install               # one install at the repo root (workspaces)
@@ -345,24 +392,10 @@ npm run default-demo      # default + recovery on Testnet
 
 ## Screenshots
 
-<!-- TODO: add docs/screenshots/*.png (landing, dashboard decision cards, guardrail refusal, settled escrow = 0) -->
-
-| Landing & portal | Live Testnet demo |
+| Landing page | Live Testnet demo, settled |
 | :-: | :-: |
-| _TODO_ | _TODO_ |
-
----
-
-## Guardrails & compliance
-
-- **Capped on-chain.** Every payment is checked by Noir's `agent_registry`. A single payout above the cap is refused before any fee is paid.
-- **Roles, not addresses.** The agent names who gets paid. Code maps roles to stored wallets and recomputes every amount, so the model can never pay an arbitrary wallet or see a secret.
-- **Two gates to settle.** A verified Velo webhook for the exact invoice amount, plus a signed berthing attestation.
-- **No double payouts.** One payment in flight per agent, and webhooks are de-duplicated by delivery ID before any side effect.
-- **No double pledging.** A second `registerDevice` for the same waybill hash is rejected on-chain (spike S3).
-- **Fail closed.** Any mismatch becomes a `HOLD`. On default, ops revokes the agent and sweeps the escrow back to treasury.
-- **Clear about what's simulated.** Real: Noir contracts on Testnet, every escrow, authorize and claim, the per-payment cap and the Velo webhook HMAC check. Simulated: AIS vessel positions, the fixed 1 XLM = ₱1,000 rate, and the debtor payment when no Velo key is set.
-- **Testnet prototype.** Factoring is regulated in the Philippines, and invoice-backed products for investors may count as securities. Shipper, vessel and debtor are fictional. Not financial advice.
+| <img src="docs/screenshots/landing.jpg" alt="Sailo landing page" width="420"> | <img src="docs/screenshots/demo-settled.jpg" alt="Live demo after settlement: escrow 0 XLM, guardrail refused over_limit, agent decisions" width="420"> |
+| Hero, invoice card and headline numbers | All stages done, escrow 0 XLM, guardrail refusal (`over_limit`), agent decisions with Stellar Expert links |
 
 ---
 
@@ -375,34 +408,30 @@ npm run default-demo      # default + recovery on Testnet
 
 ---
 
-## FAQ
-
-**Why does the agent need a cap if code already checks the amounts?**
-Defense in depth. If the agent key leaks or the code has a bug, Noir's `agent_registry` still refuses any single payment above 880 XLM, before a fee is paid.
-
-**Can the AI send money to its own wallet?**
-No. The model only names roles (`SHIPOWNER`, `LP`, `TREASURY`). Code maps those to stored addresses and recomputes every amount. A mismatch becomes a `HOLD`.
-
-**What if the ship anchors offshore near Cebu?**
-It doesn't count. Berthing requires being inside the 800 m geofence **and** at ≤ 0.5 knots for three readings in a row.
-
-**What if the cargo owner never pays?**
-After the due date plus grace, ops triggers `DEFAULT`: the agent is revoked and the escrow is swept back to treasury. In this MVP the investor bears the loss, and the UI says so.
-
-**What if Testnet is down during the demo?**
-The server can switch to an in-memory version of the contracts. Every screen labels it "simulated".
-
----
-
 ## Credits
 
 | Member | GitHub | Lane |
 | :-- | :-- | :-- |
 | Helena | [@helenaherrero515](https://github.com/helenaherrero515) | Product, pitch, frontend |
 | Ethan | [@thanreiz](https://github.com/thanreiz) | Blockchain: Noir client, executor, guardrail, recovery, Testnet proof |
-| Dia Aviles | TODO | TODO |
+| Dia Aviles | [@krstndiane](https://github.com/krstndiane) | Project manager, frontend |
 
 Built on [Noir](https://github.com/noirx402/noir) agent contracts, [Velo](https://velo-build.dev) checkout and the [Stellar](https://stellar.org/) Testnet.
+
+**Libraries**
+
+| Library | Used for |
+| :-- | :-- |
+| [`@noirx402/agent-sdk`](https://github.com/noirx402/noir) 0.3.0 | All Noir contract calls (register, policy, escrow, check, authorize, claim, unlink) |
+| [`@carts1024/velo-sdk`](https://github.com/Velo-Ecosystem-Collection/Velo) 0.1.0-alpha.4 | Checkout sessions and signed webhook verification |
+| [`@stellar/stellar-sdk`](https://github.com/stellar/js-stellar-sdk) 16.4.1 | Keypairs, native XLM asset contract, Testnet config |
+| [Nodemailer](https://nodemailer.com/) | Verification and password-reset email |
+| [`@vercel/functions`](https://vercel.com/docs/functions) | Vercel deployment of the API |
+| [tsx](https://github.com/privatenumber/tsx), [esbuild](https://esbuild.github.io/), [TypeScript](https://www.typescriptlang.org/), [Vitest](https://vitest.dev/) | Running, bundling, typing and testing |
+| [Anthropic Messages API](https://docs.anthropic.com/) (optional) | Writes the one-line reason for each agent decision |
+| [Mermaid](https://mermaid.js.org/) | Diagrams in this README |
+
+**Ideas and references:** the Velo × Noir Builder Handbook, the Noir [SDK examples](https://github.com/noirx402/noir) (`check-and-pay.ts`, webhook relay) and the Velo [Express / Next.js examples](https://github.com/Velo-Ecosystem-Collection/Velo). Invoice factoring and AIS-based proof of delivery are standard trade-finance ideas, applied here to inter-island shipping.
 
 ---
 

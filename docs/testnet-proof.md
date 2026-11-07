@@ -47,3 +47,26 @@ Device hash: `bba5925059fcda56331b89dc28f26375af1a11f4f81f1e8b9086fd871b818b25`
 | Delta | +849.9978111 (850 minus fees) |
 
 After revoke: `checkPayment` returns `no_agent`; wrapper `authorizePayment` returns the same refusal without sending a transaction.
+
+## Full loop with settlement
+
+Run via **▶ Run Demo** (`POST /api/run-demo`) on a local server in Testnet mode (wallets from `npm run provision`). Decisions in order: `ADVANCE`, berthing attestation, guardrail `REFUSED` (`over_limit`), `SETTLE`.
+
+Recorded 7 Nov 2026 with **▶ Run Demo** (`POST /api/run-demo`) in Testnet mode, using the same code as the live site. Agent wallet: [`GAP6Z…P5YV`](https://stellar.expert/explorer/testnet/account/GAP6ZDGBGPJMOYRJONXAEH5J334U5V3TR74LXRSDCWEY6NZY5ZLIP5YV).
+
+| Step | Transaction |
+| :-- | :-- |
+| Invoice registered (`device_registry`) | [056d4274…aca2](https://stellar.expert/explorer/testnet/tx/056d4274e62c7f8bd9063c1506d7da5aa23509d0ca327150adbb10fd16a5aca2) |
+| Agent policy, 880 XLM cap (`agent_registry`) | [d0dcb52b…5728](https://stellar.expert/explorer/testnet/tx/d0dcb52beb3df2bbfef044f376ff4a00bd3828fc533f4392f9526072a4255728) |
+| Investor funds 850 XLM escrow | [e3bac447…3bdc](https://stellar.expert/explorer/testnet/tx/e3bac44782f0eb3845b57cef39ed9db1a0f056d1dc3cfad88dca012ba64f3bdc) |
+| **🤖 Agent ADVANCE: authorizes 850 XLM → shipowner** | [8b8384d7…995c](https://stellar.expert/explorer/testnet/tx/8b8384d7a8e2212777a400b09fb55c70e1b176d7d67eb8fd4f9fc720cafd995c) |
+| Shipowner claims the advance | [84962bc6…901c](https://stellar.expert/explorer/testnet/tx/84962bc6cf735326adfc28e7eb11e25d87bb0ad78580b12b9a5599cfda7c901c) |
+| Treasury funds 1,000 XLM after the verified Velo webhook | [99d907da…a4f2](https://stellar.expert/explorer/testnet/tx/99d907dae85d80736f306b467d7b882cb5f527db78a47c3178db93a11214a4f2) |
+| **🤖 Agent SETTLE: authorizes 880 XLM → investor** | [d2d0c38b…388f](https://stellar.expert/explorer/testnet/tx/d2d0c38b2f482af4cb25bc3b4df14dec4a932cfb198ff4a7cfec268d4869388f) |
+| **🤖 Agent SETTLE: authorizes 115 XLM → shipowner** | [08d9f63b…91c5](https://stellar.expert/explorer/testnet/tx/08d9f63ba0430198e7281a9ada1960fb134f9aa630e64187208e8a641a4891c5) |
+| **🤖 Agent SETTLE: authorizes 5 XLM → treasury** | [83177fb2…b773](https://stellar.expert/explorer/testnet/tx/83177fb2a9b0fc91eee8ff20f07e33a479e29c7b2d64ee944f22d6893ac4b773) |
+| Investor claims | [2ecab943…fe00](https://stellar.expert/explorer/testnet/tx/2ecab94382baec3341199fa999122e7b465210fcf615493fbc4a9e76dc69fe00) |
+| Shipowner claims | [6ace8dae…5de1](https://stellar.expert/explorer/testnet/tx/6ace8dae1716ff357b9a38a40f86b9d20a7a72fb3dab80917789605115d35de1) |
+| Treasury claims | [de6a987b…f3a6](https://stellar.expert/explorer/testnet/tx/de6a987b74c94853d2ce393d2a0922717d88f1d3735daa5dfb67101b2bccf3a6) |
+
+After the claims, `balanceOf(invoice)` is `0`. In the same run, the agent's 1,000 XLM over-cap payout was refused by `checkPayment` with `over_limit` (contract error `AgentNotAuthorized #3`), with no transaction sent and no fee paid.
