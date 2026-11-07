@@ -5,16 +5,34 @@
  *   shipowner tokenizes -> any investor funds from the marketplace -> agent ADVANCE -> voyage -> berth
  *   -> the named cargo owner pays from their portal -> agent SETTLE.
  * Amounts use the same integer payout math as the on-chain demo (@noirxvelo/shared, 1 XLM = PHP 1,000).
- * Escrow and transfers here are simulated in memory; the live Testnet run is the /app demo.
  *
- * New accounts get a few private sample invoices so the portal is not empty. A sample's missing
- * counterparty (investor or cargo owner) is simulated and acts on its own after a short delay.
+ * Invoices a shipowner creates run on Stellar Testnet when the platform wallets are configured
+ * (portal-chain.ts): real Noir contracts, the real agent policy and executor, and custodial Testnet
+ * wallets for the shipowner and investor. Otherwise they run in memory and are labelled simulated.
+ *
+ * New accounts get a few private sample invoices so the portal is not empty. Samples are always
+ * simulated, and a sample's missing counterparty (investor or cargo owner) acts on its own after a short delay.
  */
 import { createHash } from "node:crypto";
-import { canonicalJson, computePayouts, phpToStroops, stroopsToPhp } from "@noirxvelo/shared";
-import { db, save, type User } from "./db.js";
+import { canonicalJson, computePayouts, fromStroops, phpToStroops, stroopsToPhp } from "@noirxvelo/shared";
+import { db, onDbLoad, save, type User } from "./db.js";
 import { HttpError } from "./http.js";
 import { normEmail } from "./accounts.js";
+import { kvEnabled } from "./kv.js";
+import {
+  MAX_ONCHAIN_FACE,
+  STEP_LABEL,
+  chainAvailable,
+  jobFor,
+  jobRunning,
+  needsRetry,
+  newChain,
+  recordPayment,
+  resetRetry,
+  signBerthing,
+  type PortalChain,
+} from "./portal-chain.js";
+import { veloCheckoutConfigured, type CheckoutSession, type VerifiedEvent } from "./velo.js";
 
 export type PState = "TOKENIZED" | "FUNDED" | "ADVANCED" | "IN_TRANSIT" | "BERTHED" | "PAID" | "SETTLED" | "HOLD";
 type Contract = "device_registry" | "agent_registry" | "payment_escrow";
@@ -28,6 +46,10 @@ export interface LogEntry {
   decision?: "ADVANCE" | "SETTLE" | "HOLD";
   pay?: [PayRole, number][];
   raw?: unknown;
+  /** Stellar Testnet transactions behind this entry. */
+  txs?: { label: string; hash: string; url: string }[];
+  /** True when the entry describes real Testnet activity (false or absent: simulated). */
+  onchain?: boolean;
 }
 
 export interface PortalInvoice {
@@ -57,6 +79,8 @@ export interface PortalInvoice {
   simInvestor: boolean;
   simDebtor: boolean;
   log: LogEntry[];
+  /** Present when the invoice runs on Stellar Testnet. */
+  chain?: PortalChain | null;
 }
 
 const VOYAGE_MS = Number(process.env.PORTAL_VOYAGE_MS ?? 20_000);
@@ -84,6 +108,7 @@ const xlm = (n: number) => (n / 1000).toLocaleString("en-US") + " XLM";
 const stroops = (php: number) => (BigInt(php) * 10_000n).toString();
 
 function escrowOf(i: PortalInvoice): number {
+  if (i.chain?.escrowXlm != null) return Math.round(Number(i.chain.escrowXlm) * 1000); // read from the chain
   const s = i.state === "HOLD" ? i.holdFrom : i.state;
   const m = money(i.face);
   return s === "FUNDED" ? m.adv : s === "PAID" ? i.face : 0;
@@ -116,11 +141,14 @@ interface NewInvoice {
   sampleFor?: string | null;
   simInvestor?: boolean;
   simDebtor?: boolean;
+  onchain?: boolean;
 }
 
 function create(n: NewInvoice): PortalInvoice {
   const { seq, id } = nextId();
-  const record = { id, vessel: n.vessel, route: n.route, debtor: n.debtor, face: String(n.face), term: n.term };
+  const chain = n.onchain ? newChain() : null;
+  // On-chain invoices add a random nonce: the registry rejects a hash that was ever registered before.
+  const record = { id, vessel: n.vessel, route: n.route, debtor: n.debtor, face: String(n.face), term: n.term, ...(chain ? { nonce: chain.nonce } : {}) };
   const hash = createHash("sha256").update(canonicalJson(record)).digest("hex");
   if (db.invoices.some((x) => x.hash === hash)) throw new HttpError(409, "This invoice is already registered.");
   const i: PortalInvoice = {
@@ -148,13 +176,15 @@ function create(n: NewInvoice): PortalInvoice {
     simInvestor: n.simInvestor ?? false,
     simDebtor: n.simDebtor ?? !n.debtorEmail,
     log: [],
+    chain,
   };
   const m = money(n.face);
-  log(i, {
-    title: "Invoice tokenized",
-    text: `SHA-256 ${hash.slice(0, 16)}… registered as the invoice’s ID, with an agent limit of ${xlm(m.cap)} per payment.`,
-    c: "device_registry",
-  });
+  log(
+    i,
+    chain
+      ? { title: "Invoice submitted", text: `SHA-256 ${hash.slice(0, 16)}… is being registered on Stellar Testnet, with an agent limit of ${xlm(m.cap)} per payment.`, c: "device_registry", onchain: true }
+      : { title: "Invoice tokenized", text: `SHA-256 ${hash.slice(0, 16)}… registered as the invoice’s ID, with an agent limit of ${xlm(m.cap)} per payment.`, c: "device_registry" },
+  );
   db.invoices.push(i);
   return i;
 }
@@ -200,13 +230,23 @@ function agentAdvance(i: PortalInvoice): void {
 
 function depart(i: PortalInvoice): void {
   const m = money(i.face);
-  log(i, { title: "Vessel departed", text: `The shipowner claimed ${peso(m.adv)}. Escrow is back to 0 until the cargo owner pays.`, c: "payment_escrow" });
+  // On-chain invoices: the claim really happened (in the advance step); the voyage itself is simulated AIS.
+  log(i, { title: "Vessel departed", text: `The shipowner claimed ${peso(m.adv)}. Escrow is back to 0 until the cargo owner pays.`, c: "payment_escrow", onchain: !!i.chain });
   setState(i, "IN_TRANSIT");
 }
 
 function berth(i: PortalInvoice): void {
   i.berthAttested = true;
-  log(i, { title: `Berthed at ${i.port}`, text: "Inside the port geofence at 0.0 kn for 3 consecutive readings. Arrival attestation recorded.", c: "agent_registry" });
+  if (i.chain) {
+    i.chain.attestation = signBerthing(i);
+    const a = i.chain.attestation;
+    log(i, {
+      title: `Berthed at ${i.port}`,
+      text: `Inside the port geofence at 0.0 kn for 3 consecutive readings (simulated AIS). Proof of delivery signed by the agent key${a ? ` ${a.signer.slice(0, 6)}…: sha256 ${a.sha256.slice(0, 16)}…` : ""}.`,
+      c: "agent_registry",
+      onchain: true,
+    });
+  } else log(i, { title: `Berthed at ${i.port}`, text: "Inside the port geofence at 0.0 kn for 3 consecutive readings. Arrival attestation recorded.", c: "agent_registry" });
   setState(i, "BERTHED");
 }
 
@@ -248,6 +288,18 @@ function agentSettle(i: PortalInvoice): void {
 /** One automatic step if its delay has passed. Returns true if the invoice changed. */
 function autoStep(i: PortalInvoice, now: number): boolean {
   const age = now - i.stateAt;
+  if (i.chain) {
+    // On-chain invoices: money moves only in chain jobs (portal-chain.ts). Only the voyage is timed here.
+    if (i.state === "ADVANCED" && age >= 1400) return depart(i), true;
+    if (i.state === "IN_TRANSIT" && age >= VOYAGE_MS) return berth(i), true;
+    if (i.state === "BERTHED" && i.simDebtor && !i.chain.payment && age >= 5000) {
+      // No cargo owner account was named, so their payment is simulated (labelled). Escrow is still funded on-chain.
+      i.chain.payment = { verified: true, eventId: `sim_${i.id}`, amountXlm: fromStroops(phpToStroops(BigInt(i.face))), amountMatches: true, verifiedBy: "simulated payer", simulated: true, at: new Date(now).toISOString() };
+      log(i, { title: "Cargo owner paid", text: `${i.debtor} (simulated) paid ${peso(i.face)} through checkout.`, c: "payment_escrow" });
+      return true;
+    }
+    return false;
+  }
   const due: Partial<Record<PState, [number, () => void]>> = {
     TOKENIZED: [i.simInvestor ? 8000 : Infinity, () => fund(i, null, "A simulated investor")],
     FUNDED: [1400, () => agentAdvance(i)],
@@ -262,12 +314,16 @@ function autoStep(i: PortalInvoice, now: number): boolean {
   return true;
 }
 
-setInterval(() => {
+function autoStepAll(): void {
   const now = Date.now();
   let changed = false;
   for (const i of db.invoices) if (autoStep(i, now)) changed = true;
   if (changed) save();
-}, 400).unref();
+}
+// Every request first catches up on time-based steps (works on serverless, where timers don't run between requests).
+onDbLoad(autoStepAll);
+// A long-running process without a shared store also advances them between requests.
+if (!kvEnabled()) setInterval(autoStepAll, 400).unref();
 
 // ---------- samples for new accounts ----------
 /** Push an invoice through the manual steps up to `target`, without waiting. */
@@ -332,7 +388,8 @@ function visible(i: PortalInvoice, u: User): boolean {
   if (u.role === "Shipowner") return i.ownerId === u.id;
   if (u.role === "Cargo owner") return i.debtorEmail === u.email;
   if (i.funderId === u.id) return true;
-  return i.state === "TOKENIZED" && !i.funderName && !i.simInvestor && i.ownerId !== u.id;
+  // On-chain invoices are listed once their registration has landed.
+  return i.state === "TOKENIZED" && !i.funderName && !i.simInvestor && i.ownerId !== u.id && (!i.chain || i.chain.registered);
 }
 
 export interface InvoiceView {
@@ -357,6 +414,15 @@ export interface InvoiceView {
   simInvestor: boolean;
   simDebtor: boolean;
   log: LogEntry[];
+  onchain: boolean;
+  /** What the chain is doing right now, for a progress note. */
+  chainBusy: string | null;
+  chainError: string | null;
+  canRetry: boolean;
+  txs: { label: string; hash: string; url: string; at: string }[];
+  /** Velo checkout to open, for the cargo owner, while the payment is outstanding. */
+  checkoutUrl: string | null;
+  paymentPending: boolean;
 }
 
 function progress(i: PortalInvoice, now: number): number {
@@ -389,16 +455,23 @@ function view(i: PortalInvoice, u: User, now: number): InvoiceView {
     simInvestor: i.simInvestor,
     simDebtor: i.simDebtor,
     log: i.log,
+    onchain: !!i.chain,
+    chainBusy: i.chain ? (jobRunning(i, now) && i.chain.job ? STEP_LABEL[i.chain.job.step] : jobFor(i) && !i.chain.error ? STEP_LABEL[jobFor(i)!] : null) : null,
+    chainError: i.chain?.error ?? null,
+    canRetry: needsRetry(i),
+    txs: (i.chain?.txs ?? []).map((t) => ({ label: t.label, hash: t.hash, url: t.url, at: t.at })),
+    checkoutUrl: u.role === "Cargo owner" && i.chain?.checkout?.url && !i.chain.payment ? i.chain.checkout.url : null,
+    paymentPending: !!i.chain?.checkout && !i.chain.payment,
   };
 }
 
-export function portalFor(u: User): { invoices: InvoiceView[]; voyageMs: number } {
+export function portalFor(u: User): { invoices: InvoiceView[]; voyageMs: number; velo: boolean } {
   const now = Date.now();
   const invoices = db.invoices
     .filter((i) => visible(i, u))
     .sort((a, b) => b.seq - a.seq)
     .map((i) => view(i, u, now));
-  return { invoices, voyageMs: VOYAGE_MS };
+  return { invoices, voyageMs: VOYAGE_MS, velo: veloCheckoutConfigured() };
 }
 
 function find(u: User, id: unknown): PortalInvoice {
@@ -423,12 +496,15 @@ export function createInvoice(u: User, b: Record<string, unknown>): InvoiceView 
   const debtorEmail = typeof b.debtorEmail === "string" && b.debtorEmail.trim() ? normEmail(b.debtorEmail) : null;
   if (debtorEmail === u.email) throw new HttpError(400, "The cargo owner must be a different account.");
   const face = Number(b.face);
-  if (!Number.isSafeInteger(face) || face < 10_000 || face > 100_000_000) throw new HttpError(400, "Enter an invoice value between ₱10,000 and ₱100,000,000 in whole pesos.");
+  const onchain = chainAvailable();
+  const maxFace = onchain ? MAX_ONCHAIN_FACE : 100_000_000;
+  if (!Number.isSafeInteger(face) || face < 10_000 || face > maxFace)
+    throw new HttpError(400, `Enter an invoice value between ₱10,000 and ${peso(maxFace)} in whole pesos${onchain ? " (Stellar Testnet limit)" : ""}.`);
   const term = Number(b.term);
   if (!TERMS.includes(term)) throw new HttpError(400, "Choose Net-30, Net-45, Net-60 or Net-90.");
   const open = db.invoices.filter((i) => i.ownerId === u.id && !i.sampleFor && i.state !== "SETTLED").length;
   if (open >= MAX_OPEN_PER_USER) throw new HttpError(429, "You have too many open invoices.");
-  const i = create({ vessel, route, debtor, debtorEmail, ownerId: u.id, ownerName: u.company || u.name, face, term });
+  const i = create({ vessel, route, debtor, debtorEmail, ownerId: u.id, ownerName: u.company || u.name, face, term, onchain });
   save();
   return view(i, u, Date.now());
 }
@@ -437,16 +513,57 @@ export function fundInvoice(u: User, id: unknown): InvoiceView {
   if (u.role !== "Investor") throw new HttpError(403, "Only investors can fund invoices.");
   const i = find(u, id);
   if (i.state !== "TOKENIZED" || i.funderName) throw new HttpError(409, "This invoice has already been funded.");
-  fund(i, u.id, u.company || u.name);
+  if (i.chain) {
+    // Reserve it for this investor; the funding transaction runs from their wallet in a chain job.
+    if (!i.chain.registered) throw new HttpError(409, "This invoice is still being registered on Stellar. Try again in a moment.");
+    i.funderId = u.id;
+    i.funderName = u.company || u.name;
+    i.chain.fundRequest = { userId: u.id, at: Date.now() };
+    log(i, { title: "Funding requested", text: `${i.funderName} is funding ${peso(money(i.face).adv)} from their Stellar Testnet wallet.`, c: "payment_escrow", onchain: true });
+  } else fund(i, u.id, u.company || u.name);
   save();
   return view(i, u, Date.now());
 }
 
-export function payInvoice(u: User, id: unknown): InvoiceView {
+export type PayPlan = { kind: "done"; view: InvoiceView } | { kind: "checkout"; invoiceId: string; amountXlm: string; description: string };
+
+/** First half of paying (under the db lock). Simulated invoices are paid at once; on-chain ones need a Velo checkout. */
+export function preparePay(u: User, id: unknown): PayPlan {
   if (u.role !== "Cargo owner") throw new HttpError(403, "Only the cargo owner can pay this invoice.");
   const i = find(u, id);
   if (i.state !== "BERTHED") throw new HttpError(409, i.state === "IN_TRANSIT" ? "The vessel has not arrived yet." : "This invoice is not awaiting payment.");
-  pay(i, u.company || u.name);
+  if (!i.chain) {
+    pay(i, u.company || u.name);
+    save();
+    return { kind: "done", view: view(i, u, Date.now()) };
+  }
+  if (i.chain.payment?.verified) return { kind: "done", view: view(i, u, Date.now()) };
+  // A real checkout already exists: send the cargo owner back to it instead of opening a second one.
+  if (i.chain.checkout && !i.chain.checkout.simulated && i.chain.checkout.url) return { kind: "done", view: view(i, u, Date.now()) };
+  return { kind: "checkout", invoiceId: i.id, amountXlm: fromStroops(phpToStroops(BigInt(i.face))), description: `Freight invoice ${i.id}: ${i.vessel}, ${i.route}` };
+}
+
+/** Second half (under the db lock again): store the checkout and, for a simulated one, its verified payment. */
+export function recordCheckout(u: User, id: unknown, session: CheckoutSession, ev: VerifiedEvent | null): InvoiceView {
+  const i = find(u, id);
+  if (!i.chain) throw new HttpError(409, "This invoice is not on Stellar.");
+  if (!i.chain.payment?.verified) {
+    if (!i.chain.checkout || i.chain.checkout.simulated) {
+      i.chain.checkout = { id: session.id, url: session.checkoutUrl, simulated: session.simulated, amountXlm: session.amount, createdAt: new Date().toISOString() };
+    }
+    if (ev) recordPayment(session.id, ev, true);
+    else log(i, { title: "Velo checkout opened", text: `Checkout ${session.id} for ${session.amount} XLM. Settlement starts when Velo confirms the payment.`, c: "payment_escrow" });
+  }
+  save();
+  return view(i, u, Date.now());
+}
+
+/** Lets a party to the invoice re-run a chain step that failed three times. */
+export function retryInvoice(u: User, id: unknown): InvoiceView {
+  const i = find(u, id);
+  if (!needsRetry(i)) throw new HttpError(409, "Nothing to retry.");
+  resetRetry(i);
+  log(i, { title: "Retrying", text: `${u.company || u.name} asked to retry: ${STEP_LABEL[jobFor(i)!]}.`, c: "payment_escrow", onchain: true });
   save();
   return view(i, u, Date.now());
 }

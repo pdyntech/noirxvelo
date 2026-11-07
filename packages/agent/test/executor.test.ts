@@ -237,6 +237,19 @@ describe("execute: refusals and partial failure", () => {
     expect(r.authorized).toEqual(["LP", "SHIPOWNER"]);
     expect(r.claimed).toEqual([]);
   });
+  it("claim NothingToClaim (an earlier claim already paid the payee out) counts as claimed", async () => {
+    const { ctx } = mkCtx(paid, {
+      claim: vi.fn(async (s: NoirSigner) => {
+        if (s.publicKey === "G_TREAS") throw new ChainError("nothing pending", { errorName: "NothingToClaim" });
+        return { hash: `c-${s.publicKey}`, explorerUrl: "u" };
+      }),
+    });
+    const r = await execute(settle(), ctx);
+    expect(r).toMatchObject({ decision: "SETTLE", ok: true, pendingUnclaimed: [] });
+    expect(r.claimed).toEqual(["LP", "SHIPOWNER", "TREASURY"]);
+    expect(r.steps.filter((x) => x.step === "claim").map((x) => x.role)).toEqual(["LP", "SHIPOWNER"]);
+  });
+
   it("claim failure: other claims still attempted, reported", async () => {
     const { ctx, client } = mkCtx(paid, {
       claim: vi.fn(async (s: NoirSigner) => {

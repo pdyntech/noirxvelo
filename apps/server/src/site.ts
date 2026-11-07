@@ -19,20 +19,47 @@
  *   GET  /api/portal
  *   POST /api/portal/invoices          shipowner tokenizes an invoice
  *   POST /api/portal/invoices/:id/fund investor funds the advance
- *   POST /api/portal/invoices/:id/pay  cargo owner pays after berthing
+ *   POST /api/portal/invoices/:id/pay  cargo owner pays after berthing (on-chain invoices: Velo checkout)
+ *   POST /api/portal/invoices/:id/retry re-run a Stellar step that failed three times
  *
  * Forms
  *   POST /api/enquiry   {name, company?, role, email, msg?}
  *   POST /api/subscribe {email}
  *
  * Every POST must be JSON (see readJson), which keeps cookie-authenticated requests CSRF-safe.
+ *
+ * Each request runs inside withDb (latest data, under the db lock). The response is held until the data is
+ * saved, so a client is never told "done" about a change that wasn't stored. Chain steps start afterwards.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import * as auth from "./accounts.js";
+import { withDb } from "./db.js";
 import { HttpError, readJson, send } from "./http.js";
-import { createInvoice, fundInvoice, payInvoice, portalFor, seedSamples } from "./portal.js";
+import { LockTimeout } from "./kv.js";
+import { createInvoice, fundInvoice, portalFor, preparePay, recordCheckout, retryInvoice, seedSamples } from "./portal.js";
+import { dueJobs, startJobs } from "./portal-chain.js";
+import { createCheckout, signSimulatedDelivery, verifyWebhook, type VerifiedEvent } from "./velo.js";
 
 type Handler = (req: IncomingMessage, res: ServerResponse, match: RegExpExecArray) => Promise<void> | void;
+
+/** Collects a response so it can be sent after the data is saved. */
+class HeldResponse {
+  status = 200;
+  headers: Record<string, string | string[]> = {};
+  body: string | Buffer = "";
+  writeHead(status: number, headers: Record<string, string | string[]> = {}) {
+    this.status = status;
+    this.headers = headers;
+    return this;
+  }
+  end(body?: string | Buffer) {
+    this.body = body ?? "";
+  }
+}
+
+/** Routes that manage withDb themselves (they wait on the network between two short locked phases). */
+const OWN_DB = new Set<Handler>();
+const ownDb = (h: Handler): Handler => (OWN_DB.add(h), h);
 
 const ok = (res: ServerResponse, body: unknown, status = 200, cookie?: string) => send(res, status, body, cookie ? { "set-cookie": cookie } : {});
 
@@ -91,12 +118,39 @@ const ROUTES: [method: string, path: RegExp, handler: Handler][] = [
     auth.requireVerified(u);
     ok(res, { invoice: createInvoice(u, body) }, 201);
   }],
-  ["POST", /^\/api\/portal\/invoices\/([A-Za-z0-9-]{1,40})\/(fund|pay)$/, async (req, res, m) => {
+  ["POST", /^\/api\/portal\/invoices\/([A-Za-z0-9-]{1,40})\/(fund|retry)$/, async (req, res, m) => {
     const u = auth.requireUser(req);
     await readJson(req);
     auth.requireVerified(u);
-    ok(res, { invoice: m[2] === "fund" ? fundInvoice(u, m[1]) : payInvoice(u, m[1]) });
+    ok(res, { invoice: m[2] === "fund" ? fundInvoice(u, m[1]) : retryInvoice(u, m[1]) });
   }],
+  ["POST", /^\/api\/portal\/invoices\/([A-Za-z0-9-]{1,40})\/pay$/, ownDb(async (req, res, m) => {
+    await readJson(req);
+    const plan = await withDb(() => {
+      const u = auth.requireUser(req);
+      auth.requireVerified(u);
+      return preparePay(u, m[1]);
+    });
+    if (plan.kind === "done") {
+      ok(res, { invoice: plan.view, checkoutUrl: plan.view.checkoutUrl });
+      startJobs(await withDb(() => dueJobs()));
+      return;
+    }
+    // Outside the lock: create the Velo checkout (a network call). Without VELO_API_KEY it is simulated,
+    // and the payment.succeeded event is signed and verified exactly like a real Velo delivery.
+    const session = await createCheckout({ invoiceId: plan.invoiceId, amountXlm: plan.amountXlm, description: plan.description });
+    let ev: VerifiedEvent | null = null;
+    if (session.simulated) {
+      const d = signSimulatedDelivery({ id: session.id, amount: session.amount, asset: session.asset, description: plan.description });
+      ev = await verifyWebhook(d.body, d.signature);
+    }
+    const r = await withDb(() => {
+      const u = auth.requireUser(req);
+      return { invoice: recordCheckout(u, m[1], session, ev), due: dueJobs() };
+    });
+    ok(res, { invoice: r.invoice, checkoutUrl: session.simulated ? null : session.checkoutUrl });
+    startJobs(r.due);
+  })],
 
   ["POST", /^\/api\/enquiry$/, async (req, res) => {
     auth.addEnquiry(req, await readJson(req));
@@ -116,9 +170,23 @@ export async function handleSite(req: IncomingMessage, res: ServerResponse, path
     if (!match) continue;
     if (m !== method) continue;
     try {
-      await handler(req, res, match);
+      if (OWN_DB.has(handler)) {
+        await handler(req, res, match);
+        return true;
+      }
+      const held = new HeldResponse();
+      let due: string[] = [];
+      await withDb(async () => {
+        await handler(req, held as unknown as ServerResponse, match);
+        due = dueJobs();
+      });
+      res.writeHead(held.status, held.headers);
+      res.end(held.body);
+      startJobs(due);
     } catch (e) {
+      if (res.headersSent) return true;
       if (e instanceof HttpError) send(res, e.status, { ok: false, error: e.message });
+      else if (e instanceof LockTimeout) send(res, 503, { ok: false, error: "Sailo is busy. Please try again in a moment." }, { "retry-after": "2" });
       else {
         console.error("site api:", e);
         send(res, 500, { ok: false, error: "Something went wrong. Please try again." });

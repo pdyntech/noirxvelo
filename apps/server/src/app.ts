@@ -8,7 +8,9 @@ import { extname, join, normalize, resolve } from "node:path";
 import { WEB_DIR } from "./env.js";
 import * as demo from "./demo.js";
 import { readBody, send, toJson } from "./http.js";
+import { kvBackend, kvEnabled, LockTimeout } from "./kv.js";
 import { handleSite } from "./site.js";
+import { handleVeloWebhook } from "./webhooks.js";
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -43,16 +45,15 @@ const ACTIONS: Record<string, () => Promise<unknown>> = {
 
 async function handleAction(path: string, res: ServerResponse): Promise<void> {
   const fn = ACTIONS[path]!;
-  const s = demo.getState();
-  if (s.busy && path !== "/api/fast-forward") return send(res, 409, { ok: false, error: `Busy: ${s.busy}` });
-  const p = fn();
+  // withDemo takes the demo lease and loads the latest saved run before the step starts.
+  const p = demo.withDemo(fn);
   // Wait briefly so quick validation errors come back in the response; long chain work continues.
   const outcome = await Promise.race([
     p.then(() => ({ done: true as const, error: null })).catch((e: unknown) => ({ done: true as const, error: e instanceof Error ? e.message : String(e) })),
     new Promise<{ done: false; error: null }>((r) => setTimeout(() => r({ done: false, error: null }), 400)),
   ]);
   p.catch(() => undefined); // errors are already recorded in state
-  if (outcome.error) return send(res, 400, { ok: false, error: outcome.error });
+  if (outcome.error) return send(res, /^Busy/.test(outcome.error) ? 409 : 400, { ok: false, error: outcome.error });
   send(res, 202, { ok: true, started: !outcome.done });
 }
 
@@ -63,20 +64,33 @@ function stream(req: IncomingMessage, res: ServerResponse): void {
     connection: "keep-alive",
     "x-accel-buffering": "no",
   });
+  let last = "";
+  let closed = false;
+  const write = async () => {
+    if (closed) return;
+    const s = await demo.viewState().catch(() => demo.getState());
+    const text = toJson(s);
+    if (text === last || closed) return;
+    last = text;
+    res.write(`data: ${text}\n\n`);
+  };
   let pending = false;
   const push = () => {
     if (pending) return;
     pending = true;
     setTimeout(() => {
       pending = false;
-      res.write(`data: ${toJson(demo.getState())}\n\n`);
+      void write();
     }, 120); // coalesce bursts of updates
   };
-  res.write(`data: ${toJson(demo.getState())}\n\n`);
-  const off = demo.subscribe(push);
+  void write();
+  const off = demo.subscribe(push); // changes made on this instance
+  const poll = setInterval(() => void write(), 1000); // changes made on another instance (shared store)
   const hb = setInterval(() => res.write(": hb\n\n"), 15000);
   req.on("close", () => {
+    closed = true;
     off();
+    clearInterval(poll);
     clearInterval(hb);
   });
 }
@@ -103,14 +117,17 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
   const url = new URL(req.url ?? "/", "http://localhost");
   const path = url.pathname;
   try {
-    if (req.method === "GET" && path === "/api/health") return send(res, 200, { ok: true, status: demo.getState().status, at: new Date().toISOString() });
-    if (req.method === "GET" && path === "/api/state") return send(res, 200, demo.getState());
+    if (req.method === "GET" && path === "/api/health") {
+      const s = await demo.viewState();
+      return send(res, 200, { ok: true, status: s.status, chain: s.config.mode, storage: kvEnabled() ? kvBackend() : process.env.VERCEL ? "memory only: add a Redis store or data resets" : "local file", at: new Date().toISOString() });
+    }
+    if (req.method === "GET" && path === "/api/state") return send(res, 200, await demo.viewState());
     if (req.method === "GET" && path === "/api/stream") return stream(req, res);
     if (req.method === "POST" && path === "/api/webhooks/velo") {
       const raw = await readBody(req);
       const sig = req.headers["x-velo-signature"];
       const dlv = req.headers["x-velo-delivery"];
-      const r = await demo.receiveWebhook(raw, typeof sig === "string" ? sig : null, typeof dlv === "string" ? dlv : null);
+      const r = await handleVeloWebhook(raw, typeof sig === "string" ? sig : null, typeof dlv === "string" ? dlv : null);
       return send(res, r.status, r.body);
     }
     if (req.method === "POST" && path in ACTIONS) return handleAction(path, res);
@@ -119,6 +136,8 @@ export async function handler(req: IncomingMessage, res: ServerResponse): Promis
     if (req.method === "GET" || req.method === "HEAD") return serveStatic(path, res);
     send(res, 405, { ok: false, error: "method not allowed" });
   } catch (e) {
+    if (res.headersSent) return;
+    if (e instanceof LockTimeout) return send(res, 503, { ok: false, error: "Busy, please try again." }, { "retry-after": "2" });
     send(res, 500, { ok: false, error: e instanceof Error ? e.message : String(e) });
   }
 }

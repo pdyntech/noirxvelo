@@ -2,10 +2,9 @@
  * Vercel function entry: every /api/* request lands here (see scripts/build-vercel.ts).
  * The static frontend in apps/web is served by Vercel's CDN, not by this function.
  *
- * Limits compared with a long-running host (Render, Railway):
- * - State lives in the function instance's memory and /tmp, so it resets when the instance is recycled
- *   and is not shared between instances. Fine for a demo, not for real accounts.
- * - Background demo steps keep running after the response through waitUntil, up to maxDuration.
+ * - Data lives in the shared store (kv.ts) when one is configured: add Upstash (Vercel Marketplace) or any
+ *   Redis. Without it, data sits in this instance's memory and /tmp and resets when the instance is recycled.
+ * - Work that outlives the response (chain transactions, a voyage) is handed to waitUntil, up to maxDuration.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { waitUntil } from "@vercel/functions";
@@ -14,18 +13,12 @@ import { waitUntil } from "@vercel/functions";
 process.env.DATA_DIR ??= "/tmp/sailo";
 
 const app = import("./app.js");
-const demo = import("./demo.js");
-
-/** Resolves when the demo is no longer busy, so long chain work isn't frozen mid-step. */
-async function untilIdle(): Promise<void> {
-  const { getState } = await demo;
-  const stopAt = Date.now() + 290_000; // stay inside maxDuration (300 s)
-  while (getState().busy && Date.now() < stopAt) await new Promise((r) => setTimeout(r, 500));
-}
+const bg = import("./background.js");
 
 export default async function vercelHandler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const { handler, ready } = await app;
   await ready;
   await handler(req, res);
-  if (req.method === "POST") waitUntil(untilIdle());
+  const { drain, hasWork } = await bg;
+  if (hasWork()) waitUntil(drain(290_000)); // stay inside maxDuration (300 s)
 }

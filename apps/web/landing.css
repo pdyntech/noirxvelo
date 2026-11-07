@@ -805,3 +805,9 @@ html.in body{background:var(--bg)}
   .ap-hero::after{display:none}
   .ap-hero .stats{margin-top:18px}
 }
+/* Portal: Stellar Testnet progress and transaction links */
+.spin{display:inline-block;width:12px;height:12px;margin-right:8px;border:2px solid var(--line);border-top-color:var(--orange);border-radius:50%;vertical-align:-1px;animation:sl-spin .8s linear infinite}
+@keyframes sl-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none;border-top-color:var(--line)}}
+.dc .txl{display:flex;flex-direction:column;gap:4px;margin:6px 0}
+.dc .txl a{word-break:break-all}

@@ -46,7 +46,7 @@ export function validateDecision(input: unknown): ValidationResult {
   for (const k of extraKeys(input, ["invoiceId", "decision", "reason", "payouts"])) errors.push(`unexpected field "${k}"`);
 
   const { invoiceId, decision, reason, payouts } = input;
-  if (typeof invoiceId !== "string" || !/^INV-[0-9]{4}-[0-9]{3}$/.test(invoiceId)) errors.push("invoiceId must match INV-YYYY-NNN");
+  if (typeof invoiceId !== "string" || !/^INV-[0-9]{4}-[0-9]{3,6}$/.test(invoiceId)) errors.push("invoiceId must match INV-YYYY-NNN (3 to 6 digits)");
   if (typeof decision !== "string" || !DECISIONS.includes(decision as DecisionKind)) errors.push("decision must be ADVANCE|SETTLE|HOLD|DEFAULT");
   if (typeof reason !== "string") errors.push("reason must be a string");
   else if (reason.length > 280) errors.push("reason must be <= 280 chars");
@@ -318,6 +318,12 @@ export async function execute(input: unknown, ctx: ExecutorContext): Promise<Exe
       claimed.push(p.role);
     } catch (e) {
       const ce = normalizeError(e);
+      // claim() pays out everything pending for the payee, across invoices. NothingToClaim after our authorize
+      // means an earlier claim by the same payee (e.g. for another invoice) already paid this amount out.
+      if (ce.errorName === "NothingToClaim") {
+        claimed.push(p.role);
+        continue;
+      }
       claimFailure ??= { step: "claim", role: p.role, reason: "chain_error", detail: `${ce.errorName}: ${ce.message}` };
       // keep going: other payees' claims are independent
     }

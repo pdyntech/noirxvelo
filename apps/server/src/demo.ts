@@ -7,11 +7,14 @@
  *
  * Chain calls go through ONE shared NoirAgentClient and are serialised (shared Testnet accounts).
  * The agent re-evaluates after every event and decides on its own; the executor re-checks everything.
+ *
+ * With a shared store (kv.ts) the run survives instance changes: one instance at a time holds the demo lease
+ * and runs steps, every change is saved as a snapshot, and other instances serve that snapshot. An instance that
+ * takes over a run whose owner disappeared resumes it (an interrupted voyage continues from its last AIS tick).
  */
 import { createHash, randomBytes } from "node:crypto";
 import { Keypair } from "@stellar/stellar-sdk";
 import {
-  NoirAgentClient,
   defaultRecovery,
   execute,
   horizonXlmBalance,
@@ -28,9 +31,11 @@ import { SEED_WAYBILL, canonicalJson, computePayouts, fromStroops, invoiceHash, 
 import { decide, type Facts } from "./agent.js";
 import { createSimChain, type SimChain } from "./simchain.js";
 import { env, missingChainEnv } from "./env.js";
+import { addBusyCheck } from "./background.js";
+import { INSTANCE_ID, delIf, extendIf, getJson, getRaw, kvEnabled, setJson, setNx } from "./kv.js";
+import { chainClient, topUp } from "./wallets.js";
 import { CEBU, TOTAL_TICKS, berthTicksFrom, isBerthed, isUnderway, makeTick, type Tick } from "./telemetry.js";
 import {
-  WebhookRejected,
   createCheckout,
   signSimulatedDelivery,
   usingRealWebhookSecret,
@@ -148,8 +153,8 @@ function getSigners(): Record<"AGENT" | Role, NoirSigner> {
   return signers;
 }
 
-let client: NoirAgentClient | null = null;
-const getClient = (): NoirAgentClient => (simMode ? getSim().client : (client ??= new NoirAgentClient()));
+// Testnet: the shared client whose writes take a per-account lock (safe across instances).
+const getClient = () => (simMode ? getSim().client : chainClient());
 
 // ---------- state ----------
 let runCounter = 0;
@@ -158,10 +163,12 @@ const listeners = new Set<(s: DemoState) => void>();
 let voyageToken = 0;
 let fastForward = false;
 const decided = new Set<string>();
-const seenDeliveries = new Set<string>();
+/** Run number whose simulated ledger lives in this instance (a simulated run can't move between instances). */
+let simLedgerRun = 0;
 
 function freshState(): DemoState {
   runCounter += 1;
+  if (simMode) simLedgerRun = runCounter;
   const id = `INV-2026-${String(runCounter).padStart(3, "0")}`;
   const miss = missingChainEnv();
   return {
@@ -222,6 +229,7 @@ export function subscribe(fn: (s: DemoState) => void): () => void {
 }
 function emit(): void {
   state.updatedAt = now();
+  persistSoon();
   for (const fn of listeners) {
     try {
       fn(state);
@@ -275,6 +283,12 @@ async function refreshBalances(): Promise<void> {
     }
   }
   emit();
+}
+
+/** Keeps a Testnet wallet able to pay `need` (plus fees), refilling from Friendbot when it runs low. */
+async function refill(pub: string, need: bigint, who: string): Promise<void> {
+  const n = await topUp(pub, need + toStroops("50"));
+  if (n) log("info", `${who} wallet was low; refilled with ${n * 10_000} test XLM from Friendbot.`);
 }
 
 // ---------- action wrapper ----------
@@ -342,6 +356,7 @@ export function fund() {
     requireChain();
     requireStatus("TOKENIZED");
     const s = getSigners();
+    if (!simMode) await refill(s.LP.publicKey, PAYOUTS.advance, "LP");
     addTx(`payment_escrow.fund_escrow (LP ${xlm(PAYOUTS.advance)} XLM)`, "LP", await serial(() => getClient().fundEscrow(s.LP, state.invoice.hash!, PAYOUTS.advance)));
     setStatus("FUNDED");
     await refreshBalances();
@@ -494,8 +509,8 @@ async function onTick(t: Tick): Promise<void> {
   }
 }
 
-async function voyageLoop(token: number): Promise<void> {
-  let seq = 0;
+async function voyageLoop(token: number, startSeq = 0): Promise<void> {
+  let seq = startSeq;
   while (token === voyageToken && seq < TOTAL_TICKS) {
     if (fastForward && seq >= 2) {
       fastForward = false;
@@ -515,6 +530,7 @@ async function voyageLoop(token: number): Promise<void> {
   if (token === voyageToken) {
     state.voyage.running = false;
     emit();
+    scheduleRelease();
   }
 }
 
@@ -566,31 +582,18 @@ export function checkout() {
   });
 }
 
-/** Velo webhook entry point. Verifies, de-duplicates, matches the session, then records the payment. */
-export async function receiveWebhook(raw: string, signature: string | null, deliveryId: string | null, simulated = false): Promise<{ status: number; body: unknown }> {
-  let ev: VerifiedEvent;
-  try {
-    ev = await verifyWebhook(raw, signature);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    log("error", `Webhook rejected: ${msg}`);
-    return { status: e instanceof WebhookRejected ? e.status : 400, body: { ok: false, error: msg } };
-  }
-  const dedupe = deliveryId ?? ev.id;
-  if (dedupe && seenDeliveries.has(dedupe)) {
-    log("warn", `Duplicate webhook delivery ${dedupe} ignored.`);
-    return { status: 200, body: { ok: true, duplicate: true } };
-  }
-  if (dedupe) seenDeliveries.add(dedupe);
-  if (ev.type !== "payment.succeeded" || !ev.paymentIntent) {
-    log("info", `Webhook ${ev.type} verified (no action).`);
-    return { status: 200, body: { ok: true, ignored: ev.type } };
-  }
+/**
+ * Applies a verified Velo payment.succeeded to the demo invoice (webhooks.ts verifies and routes it here).
+ * Idempotent: the same event twice is a no-op.
+ */
+export async function applyPayment(ev: VerifiedEvent, simulated = false): Promise<{ status: number; body: unknown }> {
   const pi = ev.paymentIntent;
+  if (!pi) return { status: 200, body: { ok: true, ignored: ev.type } };
   if (!state.checkout || pi.id !== state.checkout.id) {
     log("warn", `payment.succeeded for unknown intent ${pi.id} ignored.`);
     return { status: 200, body: { ok: true, ignored: "unknown payment intent" } };
   }
+  if (state.payment?.verified && state.payment.eventId === ev.id) return { status: 200, body: { ok: true, duplicate: true } };
   let amountMatches = false;
   try {
     amountMatches = toStroops(String(pi.amount)) === V;
@@ -600,7 +603,7 @@ export async function receiveWebhook(raw: string, signature: string | null, deli
   state.payment = {
     verified: true,
     eventId: ev.id,
-    deliveryId: dedupe ?? "",
+    deliveryId: ev.id,
     amountXlm: String(pi.amount),
     amountMatches,
     verifiedBy: ev.verifiedBy,
@@ -627,9 +630,15 @@ function progressPayment(): Promise<void> {
         await agentStep(); // HOLD with reason
         return;
       }
-      if (simMode) getSim().ledger.wallets.set(s.TREASURY.publicKey, getSim().ledger.balance(s.TREASURY.publicKey) + V); // simulated Velo payout from the debtor
-      if (simMode) getSim().ledger.wallets.set(state.addresses.DEBTOR!, getSim().ledger.balance(state.addresses.DEBTOR!) - V);
-      addTx(`payment_escrow.fund_escrow (Treasury ${xlm(V)} XLM from Velo checkout)`, "TREASURY", await serial(() => getClient().fundEscrow(s.TREASURY, state.invoice.hash!, V)));
+      // A server that stopped right after funding must not fund twice when another one resumes.
+      const already = await getClient().balanceOf(state.invoice.hash!).catch(() => 0n);
+      if (already >= V) log("info", `Escrow already holds ${xlm(already)} XLM from the Velo payment; not funding again.`);
+      else {
+        if (!simMode) await refill(s.TREASURY.publicKey, V, "Treasury");
+        if (simMode) getSim().ledger.wallets.set(s.TREASURY.publicKey, getSim().ledger.balance(s.TREASURY.publicKey) + V); // simulated Velo payout from the debtor
+        if (simMode) getSim().ledger.wallets.set(state.addresses.DEBTOR!, getSim().ledger.balance(state.addresses.DEBTOR!) - V);
+        addTx(`payment_escrow.fund_escrow (Treasury ${xlm(V)} XLM from Velo checkout)`, "TREASURY", await serial(() => getClient().fundEscrow(s.TREASURY, state.invoice.hash!, V)));
+      }
       if (state.run !== run) return;
       setStatus("PAID");
       await refreshBalances();
@@ -637,6 +646,7 @@ function progressPayment(): Promise<void> {
       await agentStep(); // SETTLE
     } finally {
       paymentInFlight = null;
+      scheduleRelease();
     }
   })();
   return paymentInFlight;
@@ -649,8 +659,14 @@ export function simulateWebhook() {
       state.checkout = await createCheckout({ invoiceId: state.invoice.id, amountXlm: xlm(V), description: `Freight invoice ${state.invoice.id}` });
     }
     const d = signSimulatedDelivery({ id: state.checkout.id, amount: xlm(V), asset: state.checkout.asset, description: `Freight invoice ${state.invoice.id}` });
-    log("info", `Simulated payment.succeeded signed (HMAC-SHA256) and posted to /api/webhooks/velo.`);
-    const r = await receiveWebhook(d.body, d.signature, d.deliveryId, true);
+    log("info", `Simulated payment.succeeded signed (HMAC-SHA256) and verified like a delivery to /api/webhooks/velo.`);
+    let ev: VerifiedEvent;
+    try {
+      ev = await verifyWebhook(d.body, d.signature);
+    } catch (e) {
+      throw new StepError(`webhook rejected: ${e instanceof Error ? e.message : e}`);
+    }
+    const r = await applyPayment(ev, true);
     if (r.status !== 200) throw new StepError(`webhook returned ${r.status}`);
     if (paymentInFlight) await paymentInFlight;
   });
@@ -793,6 +809,182 @@ async function inner(step: () => Promise<unknown>): Promise<void> {
   }
 }
 
+// ---------- shared state across instances ----------
+const SNAP = "demo:state";
+const LEASE = "demo:lease";
+const LEASE_MS = 30_000;
+let leaseHeld = false;
+let leaseKeeper: NodeJS.Timeout | null = null;
+let activeOps = 0;
+let persistTimer: NodeJS.Timeout | null = null;
+let persistQueue: Promise<void> = Promise.resolve();
+
+/** Work in progress on this instance (a step, a voyage, a payment, or a request being handled). */
+export const isActive = (): boolean => activeOps > 0 || !!state.busy || state.voyage.running || !!paymentInFlight;
+addBusyCheck(() => isActive() || leaseHeld || !!persistTimer);
+
+function persistSoon(): void {
+  if (!kvEnabled() || !leaseHeld || persistTimer) return;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    void persistNow();
+  }, 250);
+}
+function persistNow(): Promise<void> {
+  if (!kvEnabled()) return Promise.resolve();
+  const snap = state;
+  persistQueue = persistQueue.then(() => setJson(SNAP, snap)).catch((e) => console.error("demo: save failed:", e instanceof Error ? e.message : e));
+  return persistQueue;
+}
+
+let leaseQueue: Promise<unknown> = Promise.resolve();
+function inLeaseQueue<T>(fn: () => Promise<T>): Promise<T> {
+  const p = leaseQueue.then(fn, fn);
+  leaseQueue = p.catch(() => undefined);
+  return p;
+}
+
+async function acquireLease(): Promise<boolean> {
+  if (!kvEnabled()) return true;
+  if (leaseHeld && (await extendIf(LEASE, INSTANCE_ID, LEASE_MS))) return true;
+  leaseHeld = false;
+  if (!(await setNx(LEASE, INSTANCE_ID, LEASE_MS)) && (await getRaw(LEASE)) !== INSTANCE_ID) return false;
+  leaseHeld = true;
+  leaseKeeper ??= setInterval(() => {
+    if (!leaseHeld) return;
+    void extendIf(LEASE, INSTANCE_ID, LEASE_MS)
+      .then((kept) => {
+        if (!kept) {
+          leaseHeld = false;
+          console.error("demo: lease lost while running; another instance may take over.");
+        }
+      })
+      .catch(() => undefined);
+  }, 5_000);
+  return true;
+}
+
+async function releaseIfIdle(): Promise<void> {
+  if (!kvEnabled() || !leaseHeld || isActive()) return;
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
+  await persistNow();
+  if (isActive()) return;
+  await delIf(LEASE, INSTANCE_ID).catch(() => undefined);
+  leaseHeld = false;
+  if (leaseKeeper) clearInterval(leaseKeeper);
+  leaseKeeper = null;
+}
+
+/** Hand the demo back once this instance has nothing left to do (a short delay lets a follow-up step start). */
+function scheduleRelease(): void {
+  if (!kvEnabled()) return;
+  setTimeout(() => void inLeaseQueue(releaseIfIdle), 1_500);
+}
+
+export class BusyElsewhere extends Error {
+  constructor() {
+    super("Busy: the demo is running on another server. It shows up here as it progresses; try again when it finishes.");
+  }
+}
+
+const STATUS_OF: Record<string, Status> = { ADVANCE: "FUNDED", SETTLE: "PAID", HOLD: "PAID" };
+
+/** Takes over the saved run (this instance now holds the lease). Resumes work its last owner left unfinished. */
+function adopt(snap: DemoState): void {
+  if (snap.config.mode === "simulation" && !["DRAFT", "SETTLED", "DEFAULT"].includes(snap.status) && simLedgerRun !== snap.run) {
+    // Simulated contracts live in one server's memory, so a simulated run can't continue elsewhere.
+    runCounter = Math.max(runCounter, snap.run);
+    simMode = true;
+    sim = null;
+    state = freshState();
+    log("warn", "The simulated run restarted because it moved to another server. Testnet runs continue where they left off.");
+    return;
+  }
+  const interrupted = snap.busy;
+  const voyageWasRunning = snap.voyage.running;
+  state = snap;
+  runCounter = Math.max(runCounter, snap.run);
+  const miss = missingChainEnv();
+  simMode = snap.config.mode === "simulation" || miss.length > 0;
+  state.config = {
+    ...state.config,
+    chainReady: simMode || miss.length === 0,
+    mode: simMode ? "simulation" : "testnet",
+    canGoLive: miss.length === 0,
+    missing: miss,
+    veloCheckout: veloCheckoutConfigured(),
+    realWebhookSecret: usingRealWebhookSecret(),
+    llm: !!env("LLM_API_KEY"),
+  };
+  decided.clear();
+  for (const d of state.decisions) if (STATUS_OF[d.requested]) decided.add(`${state.run}:${d.requested}:${STATUS_OF[d.requested]}`);
+  state.busy = null;
+  state.autopilot = false;
+  state.voyage.running = false;
+  if (interrupted) log("warn", `"${interrupted}" was interrupted when its server stopped. Picking up from the last saved step.`);
+  if (voyageWasRunning && !state.voyage.berthed && ["FUNDED", "ADVANCED", "IN_TRANSIT"].includes(state.status)) {
+    const from = state.voyage.latest ? state.voyage.latest.seq + 1 : 0;
+    state.voyage.running = true;
+    log("warn", `Voyage resumed on this server from AIS tick ${from}.`);
+    const token = ++voyageToken;
+    voyagePromise = voyageLoop(token, from).catch((e) => log("error", `voyage: ${e instanceof Error ? e.message : e}`));
+  } else if (state.status === "BERTHED" && state.payment?.verified) {
+    void progressPayment().catch((e) => log("error", `settlement: ${e instanceof Error ? e.message : e}`));
+  } else if (state.status === "PAID") {
+    void serial(() => agentStep()).catch((e) => log("error", `settlement: ${e instanceof Error ? e.message : e}`));
+  }
+  emit();
+}
+
+/**
+ * Runs a demo step on this instance: takes the lease (or reports that another instance is running the demo),
+ * loads the latest saved run, then calls fn.
+ */
+export async function withDemo<T>(fn: () => Promise<T>): Promise<T> {
+  activeOps++;
+  try {
+    if (!(await inLeaseQueue(acquireLease))) throw new BusyElsewhere();
+    if (kvEnabled() && !state.busy && !state.voyage.running && !paymentInFlight) {
+      const snap = await getJson<DemoState>(SNAP);
+      if (snap && (snap.run !== state.run || snap.updatedAt > state.updatedAt)) adopt(snap);
+    }
+    return await fn();
+  } finally {
+    activeOps--;
+    scheduleRelease();
+  }
+}
+
+let viewCache: { at: number; snap: DemoState | null; p: Promise<DemoState | null> | null } = { at: 0, snap: null, p: null };
+
+/**
+ * The run to show: this instance's own state while it holds the lease, otherwise the saved snapshot.
+ * A saved run that is mid-step with nobody holding the lease (its server stopped) is taken over and resumed.
+ */
+export async function viewState(): Promise<DemoState> {
+  if (!kvEnabled() || leaseHeld) return state;
+  const t = Date.now();
+  if (t - viewCache.at > 800 && !viewCache.p) {
+    viewCache.p = (async () => {
+      const snap = await getJson<DemoState>(SNAP).catch(() => null);
+      if (snap && (snap.busy || snap.voyage.running || (snap.status === "BERTHED" && snap.payment?.verified) || snap.status === "PAID")) {
+        const holder = await getRaw(LEASE).catch(() => "unknown");
+        if (holder === null) void withDemo(async () => undefined).catch(() => undefined); // orphaned run: resume it here
+      }
+      return snap;
+    })().finally(() => {
+      viewCache.at = Date.now();
+      viewCache.p = null;
+    });
+    viewCache.snap = (await viewCache.p) ?? viewCache.snap;
+  } else if (viewCache.p) viewCache.snap = (await viewCache.p) ?? viewCache.snap;
+  if (leaseHeld) return state;
+  return viewCache.snap ?? state;
+}
+
 export async function init(): Promise<void> {
   if (simMode) {
     log("warn", state.config.missing.length ? `Testnet wallets missing (${state.config.missing.join(", ")}): running in SIMULATION mode.` : "SIMULATE_CHAIN=1: running in SIMULATION mode.");
@@ -807,5 +999,6 @@ export async function init(): Promise<void> {
     log("warn", `Wallets missing (${state.config.missing.join(", ")}). UI runs read-only until they are set.`);
   }
   if (!state.config.realWebhookSecret) log("warn", "VELO_WEBHOOK_SECRET not set: only simulated (self-signed) webhooks will verify.");
-  await refreshBalances();
+  // With a shared store, balances are refreshed by whichever instance runs the demo.
+  if (!kvEnabled()) await refreshBalances();
 }

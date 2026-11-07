@@ -96,7 +96,7 @@ var ST=['TOKENIZED','FUNDED','ADVANCED','IN_TRANSIT','BERTHED','PAID','SETTLED']
 var LB={TOKENIZED:'Tokenized',FUNDED:'Funded',ADVANCED:'Advanced',IN_TRANSIT:'In transit',BERTHED:'Berthed',PAID:'Paid',SETTLED:'Settled',HOLD:'On hold'};
 var PG={'Shipowner':[['inv','Invoices'],['pay','Payouts'],['acct','Account']],'Investor':[['mkt','Marketplace'],['pf','Portfolio'],['acct','Account']],'Cargo owner':[['due','To pay'],['hist','History'],['acct','Account']]};
 var HD={inv:['Your invoices','Tokenize an invoice and follow it from advance to settlement.'],pay:['Payouts','Every advance and rebate across your invoices.'],mkt:['Marketplace','Verified freight invoices open for funding.'],pf:['Portfolio','The advances you funded and what comes back.'],due:['Invoices to pay','Pay when the vessel has arrived.'],hist:['History','Invoices you have paid.'],acct:['Your account','Profile, password and the devices you’re signed in on.']};
-var role='Shipowner',page='inv',sel=null,inv=[],last='',timer=null,openDet={},busy=false;
+var role='Shipowner',page='inv',sel=null,inv=[],last='',timer=null,openDet={},busy=false,veloLive=false;
 
 function si(i){return ST.indexOf(i.state==='HOLD'?i.holdFrom:i.state)}
 function sum(fn){return inv.reduce(function(a,i){return a+fn(i)},0)}
@@ -118,6 +118,11 @@ function stats(){var S={
 function bd(i){var c=i.state==='SETTLED'?'ok':i.state==='HOLD'?'hold':'go';return '<span class="bd '+c+'">'+LB[i.state]+'</span>'}
 
 function action(i){var m=i.m,s=i.state;
+ if(i.onchain&&s!=='HOLD'&&s!=='SETTLED'){
+  if(i.canRetry)return ['A Stellar Testnet step failed three times: '+esc(i.chainError||'unknown error')+'. Transactions that already landed are kept, and a retry continues from there.','retry','Retry on Stellar'];
+  if(i.chainBusy)return ['<span class="spin" aria-hidden="true"></span>'+esc(i.chainBusy)+'…'+(i.chainError?' <span class="mute">(retrying after: '+esc(i.chainError)+')</span>':'')];
+  if(s==='BERTHED'&&role==='Cargo owner'&&i.checkoutUrl)return ['Your Velo checkout is open. Settlement starts on Stellar as soon as Velo confirms the payment.','checkout','Open Velo checkout'];
+  if(s==='BERTHED'&&i.paymentPending)return ['Waiting for Velo to confirm the cargo owner’s payment.']}
  if(s==='HOLD'){var last=i.log[i.log.length-1];return ['The agent held this invoice. Nothing moved. '+(last?esc(last.text):'')]}
  if(s==='TOKENIZED'){
   if(role==='Investor')return ['Open for funding. You fund '+fmt(m.adv)+' and receive '+fmt(m.lp)+' at settlement.','fund','Fund '+fmt(m.adv)];
@@ -131,14 +136,14 @@ function action(i){var m=i.m,s=i.state;
 
 function detail(i){var m=i.m,a=action(i),k=si(i),who2=role==='Shipowner'?i.debtor:i.owner;
  var rws=[['Advance to shipowner',m.adv,'var(--teal)'],['Repaid to investor',m.lp,'var(--gb)'],['Rebate to shipowner',m.reb,'var(--orange)'],['Protocol fee',m.fee,'var(--mute)']];
- var h='<div class="card"><div class="dh"><div><h2>'+esc(i.vessel)+'</h2><p>'+esc(i.route)+' · '+esc(who2)+' · Net-'+i.term+(i.sample?' · Sample':'')+'</p></div><div class="fv">'+fmt(i.face)+'<small>'+xl(i.face)+' · '+esc(i.id)+'</small></div></div><ol class="trk">'+ST.map(function(s,x){return '<li class="'+(x<k?'d':x===k?'c':'')+'">'+LB[s]+'</li>'}).join('')+'</ol></div>';
+ var h='<div class="card"><div class="dh"><div><h2>'+esc(i.vessel)+'</h2><p>'+esc(i.route)+' · '+esc(who2)+' · Net-'+i.term+(i.sample?' · Sample (simulated)':'')+(i.onchain?' · <span class="bd go">Stellar Testnet</span>':'')+'</p></div><div class="fv">'+fmt(i.face)+'<small>'+xl(i.face)+' · '+esc(i.id)+'</small></div></div><ol class="trk">'+ST.map(function(s,x){return '<li class="'+(x<k?'d':x===k?'c':'')+'">'+LB[s]+'</li>'}).join('')+'</ol></div>';
  h+='<div class="card act"><p>'+a[0]+'</p>'+(a[1]?'<button class="btn" data-act="'+a[1]+'" data-id="'+esc(i.id)+'" type="button">'+a[2]+'</button>':'')+'</div>';
  if(k>=2&&k<=4&&i.state!=='HOLD')h+='<div class="card vy"><h3>Voyage</h3><div class="bar"><i style="width:'+i.prog+'%"></i></div><div class="ends"><span>Departed</span><span>'+esc(i.port)+'</span></div></div>';
  h+='<div class="g2"><div class="card"><h3>Where the money goes</h3>'+rws.map(function(r){return '<div class="mrow"><div><span>'+r[0]+'</span><b>'+fmt(r[1])+'</b></div><div class="bar"><i style="width:'+(r[1]/i.face*100).toFixed(1)+'%;background:'+r[2]+'"></i></div></div>'}).join('')+'<div class="esc"><span>Escrow balance now</span><b>'+xl(i.escrow)+'</b></div></div>';
  h+='<div class="card"><h3>Agent limits</h3><div class="pol"><div><span>Largest single payment</span><b>'+xl(m.cap)+'</b></div><div><span>Asset</span><b>XLM</b></div><div><span>Expires</span><b>Net-'+i.term+' + grace</b></div><div><span>Payees</span><b>Fixed by role</b></div></div><p style="margin:0;font-size:13px;color:var(--mute)">The agent cannot pay more than this in one payment. Anything over the limit is refused and nothing moves.</p></div></div>';
  h+='<div class="card" style="margin-top:16px"><h3>Agent activity</h3>'+(i.log.length?i.log.slice().reverse().map(function(e,x){var key=i.id+':'+(i.log.length-x);
   var chip=e.decision?'<span class="bd '+(e.decision==='HOLD'?'hold':'go')+'">'+e.decision+'</span>':'';
-  return '<div class="dc"><div class="t">'+chip+(e.decision?'':esc(e.title))+'</div><p>'+esc(e.text)+'</p>'+(e.pay&&e.pay.length?'<div class="pay">'+e.pay.map(function(p){return '<span>'+p[0]+' '+xl(p[1])+'</span>'}).join('')+'</div>':'')+'<span class="cn">'+e.c+' · simulated · '+new Date(e.at).toLocaleTimeString()+'</span>'+(e.raw?'<details data-k="'+esc(key)+'"'+(openDet[key]?' open':'')+'><summary>Raw decision</summary><pre>'+esc(JSON.stringify(e.raw,null,2))+'</pre></details>':'')+'</div>'}).join(''):'<p style="color:var(--mute)">Nothing yet.</p>')+'</div>';
+  return '<div class="dc"><div class="t">'+chip+(e.decision?'':esc(e.title))+'</div><p>'+esc(e.text)+'</p>'+(e.pay&&e.pay.length?'<div class="pay">'+e.pay.map(function(p){return '<span>'+p[0]+' '+xl(p[1])+'</span>'}).join('')+'</div>':'')+(e.txs&&e.txs.length?'<div class="txl">'+e.txs.map(function(t){return '<a href="'+esc(t.url)+'" target="_blank" rel="noopener">'+esc(t.label)+' · '+esc(t.hash.slice(0,8))+'… ↗</a>'}).join('')+'</div>':'')+'<span class="cn">'+e.c+' · '+(e.onchain?'Stellar Testnet':'simulated')+' · '+new Date(e.at).toLocaleTimeString()+'</span>'+(e.raw?'<details data-k="'+esc(key)+'"'+(openDet[key]?' open':'')+'><summary>Raw decision</summary><pre>'+esc(JSON.stringify(e.raw,null,2))+'</pre></details>':'')+'</div>'}).join(''):'<p style="color:var(--mute)">Nothing yet.</p>')+'</div>';
  return h}
 
 function body(){var b=$('ap-body'),R=rows();
@@ -161,7 +166,7 @@ function load(force){
     if(r.__status!==200){err(r.error||'Could not load your portal.');return}
     err('');
     var key=JSON.stringify(r.invoices);
-    inv=r.invoices;
+    inv=r.invoices;veloLive=!!r.velo;
     /* Verification can't be undone, so a response that started before it finished must not undo it. */
     if(r.user){if(user&&user.emailVerified)r.user.emailVerified=true;user=r.user;banner()}
     /* The account page holds forms, so polling never re-renders it. */
@@ -180,11 +185,16 @@ document.addEventListener('click',function(e){
    if(matchMedia('(max-width:900px)').matches){var dt=document.querySelector('#ap-body .ap-cols>section');if(dt)dt.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'})}
    return}
  var ac=e.target.closest('#ap-body [data-act]');if(!ac||busy)return;
- var id=ac.dataset.id,act=ac.dataset.act;busy=true;ac.disabled=true;ac.setAttribute('aria-busy','true');
- post('/api/portal/invoices/'+encodeURIComponent(id)+'/'+act,{}).then(function(){
+ var id=ac.dataset.id,act=ac.dataset.act;
+ if(act==='checkout'){var ci=inv.filter(function(x){return x.id===id})[0];if(ci&&ci.checkoutUrl)window.open(ci.checkoutUrl,'_blank','noopener');return}
+ /* Open the window during the click, so the browser doesn't block it; the checkout URL is filled in after. */
+ var w=act==='pay'&&veloLive?window.open('about:blank','_blank'):null;
+ busy=true;ac.disabled=true;ac.setAttribute('aria-busy','true');
+ post('/api/portal/invoices/'+encodeURIComponent(id)+'/'+act,{}).then(function(r){
+   if(w){if(r&&r.checkoutUrl){try{w.opener=null}catch(_){}w.location=r.checkoutUrl}else w.close()}
    if(act==='fund'){page='pf';sel=id;scrollTo(0,0)}
    return load(true);
- }).catch(function(x){err(x.message);load(true)}).then(function(){busy=false});
+ }).catch(function(x){if(w)w.close();err(x.message);load(true)}).then(function(){busy=false});
 });
 
 $('ap-form').addEventListener('submit',function(e){e.preventDefault();var fm=e.target,n=$('ap-fnote'),btn=fm.querySelector('button[type=submit]');if(!fm.reportValidity())return;
@@ -208,6 +218,7 @@ function account(){
   '<label><span>Company <span class="opt">(optional)</span></span><input name="company" maxlength="120" autocomplete="organization" value="'+esc(u.company)+'"></label>'+
   '<div class="ro"><span>Email</span><b>'+esc(u.email)+'</b> <span class="bd '+(v?'ok':'hold')+'">'+(v?'Verified':'Not verified')+'</span></div>'+
   '<div class="ro"><span>Account type</span><b>'+esc(u.role)+'</b></div>'+
+  (u.wallet?'<div class="ro"><span>Stellar Testnet wallet</span><b><a href="https://stellar.expert/explorer/testnet/account/'+esc(u.wallet)+'" target="_blank" rel="noopener">'+esc(u.wallet.slice(0,6)+'…'+u.wallet.slice(-4))+' ↗</a></b></div>':(u.role!=='Cargo owner'?'<div class="ro"><span>Stellar Testnet wallet</span><b class="mute">Created with your first invoice</b></div>':''))+
   '<button class="btn" type="submit">Save profile</button><p class="fnote" role="status"></p></form></section>'+
  '<section class="card"><h3>Change password</h3><form id="acct-pw" class="aform" novalidate>'+
   '<input type="email" name="username" autocomplete="username" value="'+esc(u.email)+'" hidden>'+

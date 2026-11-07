@@ -39,6 +39,8 @@ export interface PublicUser {
   company: string;
   role: AccountRole;
   emailVerified: boolean;
+  /** Stellar Testnet address of the account's portal wallet, once it exists. */
+  wallet: string | null;
 }
 
 export const publicUser = (u: User): PublicUser => ({
@@ -48,6 +50,7 @@ export const publicUser = (u: User): PublicUser => ({
   company: u.company,
   role: u.role,
   emailVerified: Boolean(u.emailVerifiedAt),
+  wallet: u.wallet?.publicKey ?? null,
 });
 
 export const authConfig = () => ({ mail: mailConfigured, verificationRequired, devLinks });
