@@ -248,8 +248,8 @@ Without `VELO_API_KEY`, checkout is simulated and **labelled as simulated** in t
 Every transaction below was made on Stellar Testnet through the Noir SDK by the same agent code the demo uses. The settle run was recorded 7 Nov 2026; the lifecycle and default runs on 6 Nov 2026 by [`scripts/lifecycle.ts`](scripts/lifecycle.ts) and [`scripts/default-demo.ts`](scripts/default-demo.ts). Full details are in [`docs/testnet-proof.md`](docs/testnet-proof.md).
 
 <p align="center">
-  <img src="docs/screenshots/demo-settled.jpg" alt="Sailo Ops view after a live Stellar Testnet run: invoice INV-2026-001 settled, escrow 0 XLM, over_limit guardrail refusal, and agent decisions linking to Stellar Expert" width="900">
-  <br><sub>Live Stellar Testnet run, settled: every stage done, escrow 0 XLM, the 1,000 XLM over-cap payout refused (<code>over_limit</code>), and each agent decision linked to Stellar Expert.</sub>
+  <a href="https://stellar.expert/explorer/testnet/tx/2c0cb3dc217caa3378e24958f6cae9941ca68c2bf845453aa193d0b2b09afdec"><img src="docs/screenshots/testnet-claim.png" alt="Stellar Expert: the investor's claim on the Noir payment escrow contract, signed by the investor wallet, status Successful, ledger 5604688" width="900"></a>
+  <br><sub>End-to-end demo run on the live site (7 Nov 2026): the investor's 880 XLM settlement claim on the Noir payment escrow, signed by the investor and confirmed on Stellar Testnet (ledger 5604688, status Successful): <a href="https://stellar.expert/explorer/testnet/tx/2c0cb3dc217caa3378e24958f6cae9941ca68c2bf845453aa193d0b2b09afdec">2c0cb3dc…afdec</a>.</sub>
 </p>
 
 **Full loop, end to end (register → fund → advance → Velo payment → settle → claims)**
