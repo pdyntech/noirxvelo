@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="apps/web/assets/hero.jpg" alt="Sailo: a cargo port at dusk" width="720">
+  <img src="docs/sailo-logo.png" alt="Sailo logo: Move Freight. Unlock Capital." width="720">
 </p>
 
 <h1 align="center">Sailo</h1>
